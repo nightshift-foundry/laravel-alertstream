@@ -49,6 +49,6 @@
     "post-install-cmd": ["@prepare"],
     "post-update-cmd": ["@prepare"]
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "prefer-stable": true
 }
