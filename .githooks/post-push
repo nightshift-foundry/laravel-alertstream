@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Load .env if it exists
+if [ -f "$(git rev-parse --show-toplevel)/.env" ]; then
+  export $(grep -v '^#' "$(git rev-parse --show-toplevel)/.env" | xargs)
+fi
+
+PACKAGIST_TOKEN="${PACKAGIST_API_TOKEN}"
+
+if [ -z "$PACKAGIST_TOKEN" ]; then
+  echo "⚠️  PACKAGIST_API_TOKEN not set in .env, skipping Packagist notification."
+  exit 0
+fi
+
+while read local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_ref" == refs/tags/* ]]; then
+    echo "🚀 Notifying Packagist..."
+    curl -s -X POST "https://packagist.org/api/update-package?username=nightshift-foundry&apiToken=${PACKAGIST_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{"repository": {"url": "https://github.com/nightshift-foundry/laravel-alertstream"}}' \
+      && echo "✅ Packagist notified." \
+      || echo "⚠️  Failed to notify Packagist."
+  fi
+done
