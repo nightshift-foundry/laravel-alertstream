@@ -25,6 +25,28 @@ class TeamsChannel implements AlertChannel
 
         $severity = $context['severity'] ?? 'error';
 
+        $severityStyle = match (strtolower($severity)) {
+            'critical', 'emergency', 'alert', 'error' => 'attention',
+            'warning' => 'warning',
+            'notice', 'info' => 'accent',
+            default => 'emphasis',
+        };
+
+        $severityColor = match (strtolower($severity)) {
+            'critical', 'emergency', 'alert', 'error' => 'attention',
+            'warning' => 'warning',
+            'notice', 'info' => 'accent',
+            default => 'default',
+        };
+
+        $severityEmoji = match (strtolower($severity)) {
+            'critical', 'emergency', 'alert' => '🔴',
+            'error' => '🚨',
+            'warning' => '⚠️',
+            'notice', 'info' => 'ℹ️',
+            default => '🔵',
+        };
+
         $facts = [
             ['title' => 'Message',     'value' => $exception->getMessage()],
             ['title' => 'File',        'value' => $exception->getFile() . ':' . $exception->getLine()],
@@ -37,24 +59,103 @@ class TeamsChannel implements AlertChannel
         }
 
         $cardBody = [
+            // ── Coloured header band ──────────────────────────────────────
             [
-                'type' => 'TextBlock',
-                'text' => $title,
-                'wrap' => true,
-                'weight' => 'Bolder',
-                'size' => 'Medium',
+                'type' => 'Container',
+                'style' => $severityStyle,
+                'bleed' => true,
+                'spacing' => 'None',
+                'items' => [
+                    [
+                        'type' => 'ColumnSet',
+                        'columns' => [
+                            [
+                                'type' => 'Column',
+                                'width' => 'stretch',
+                                'items' => [
+                                    [
+                                        'type' => 'TextBlock',
+                                        'text' => $severityEmoji . '  ' . $title,
+                                        'wrap' => true,
+                                        'weight' => 'Bolder',
+                                        'size' => 'Large',
+                                        'color' => 'Light',
+                                    ],
+                                    [
+                                        'type' => 'TextBlock',
+                                        'text' => 'Captured at ' . now()->toDateTimeString(),
+                                        'wrap' => true,
+                                        'size' => 'Small',
+                                        'color' => 'Light',
+                                        'spacing' => 'None',
+                                        'isSubtle' => true,
+                                    ],
+                                ],
+                            ],
+                            [
+                                'type' => 'Column',
+                                'width' => 'auto',
+                                'verticalContentAlignment' => 'Center',
+                                'items' => [
+                                    [
+                                        'type' => 'TextBlock',
+                                        'text' => strtoupper($severity),
+                                        'weight' => 'Bolder',
+                                        'size' => 'Small',
+                                        'color' => 'Light',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
             ],
+
+            // ── Exception message ─────────────────────────────────────────
             [
-                'type' => 'TextBlock',
-                'text' => 'Captured at ' . now()->toDateTimeString(),
-                'wrap' => true,
-                'spacing' => 'Small',
-                'isSubtle' => true,
-            ],
-            [
-                'type' => 'FactSet',
-                'facts' => $facts,
+                'type' => 'Container',
+                'style' => 'emphasis',
                 'spacing' => 'Medium',
+                'separator' => true,
+                'items' => [
+                    [
+                        'type' => 'TextBlock',
+                        'text' => 'EXCEPTION',
+                        'weight' => 'Bolder',
+                        'size' => 'Small',
+                        'color' => $severityColor,
+                        'spacing' => 'None',
+                    ],
+                    [
+                        'type' => 'TextBlock',
+                        'text' => $exception->getMessage(),
+                        'wrap' => true,
+                        'spacing' => 'Small',
+                        'isSubtle' => false,
+                    ],
+                ],
+            ],
+
+            // ── Details fact-set ──────────────────────────────────────────
+            [
+                'type' => 'Container',
+                'spacing' => 'Medium',
+                'separator' => true,
+                'items' => [
+                    [
+                        'type' => 'TextBlock',
+                        'text' => 'DETAILS',
+                        'weight' => 'Bolder',
+                        'size' => 'Small',
+                        'color' => $severityColor,
+                        'spacing' => 'None',
+                    ],
+                    [
+                        'type' => 'FactSet',
+                        'facts' => array_filter($facts, fn ($f) => $f['title'] !== 'Message'),
+                        'spacing' => 'Small',
+                    ],
+                ],
             ],
         ];
 
@@ -77,7 +178,9 @@ class TeamsChannel implements AlertChannel
 
         $payload = [
             'type' => 'message',
-            'Attachments' => true,  // capital A — satisfies PA flow null-check, routes to forEach branch
+            'summary' => '🚨 ' . $title . ' — ' . $exception->getMessage(),
+            'text' => '[' . ucfirst($severity) . '] ' . $title . ': ' . $exception->getMessage(),
+            'Attachments' => true,
             'attachments' => [
                 [
                     'contentType' => 'application/vnd.microsoft.card.adaptive',
