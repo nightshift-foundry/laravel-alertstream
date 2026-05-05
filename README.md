@@ -1,7 +1,7 @@
 # AlertStream - Laravel Alert & Exception Reporting
 
-[![Tests](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/tests.yml/badge.svg)](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/tests.yml)
-[![Code Style](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/codestyle.yml/badge.svg)](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/codestyle.yml)
+[![Tests](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/tests.yml)
+[![Code Style](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/codestyle.yml/badge.svg?branch=main)](https://github.com/nightshift-foundry/laravel-alertstream/actions/workflows/codestyle.yml)
 [![codecov](https://codecov.io/gh/nightshift-foundry/laravel-alertstream/branch/main/graph/badge.svg)](https://codecov.io/gh/nightshift-foundry/laravel-alertstream)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/nightshift-foundry/laravel-alertstream/security)
 
