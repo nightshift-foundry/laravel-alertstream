@@ -24,22 +24,23 @@ class TeamsChannel implements AlertChannel
         }
 
         $severity = $context['severity'] ?? 'error';
+        $severityLower = strtolower($severity);
 
-        $severityStyle = match (strtolower($severity)) {
+        $severityStyle = match ($severityLower) {
             'critical', 'emergency', 'alert', 'error' => 'attention',
             'warning' => 'warning',
             'notice', 'info' => 'accent',
             default => 'emphasis',
         };
 
-        $severityColor = match (strtolower($severity)) {
+        $severityColor = match ($severityLower) {
             'critical', 'emergency', 'alert', 'error' => 'attention',
             'warning' => 'warning',
             'notice', 'info' => 'accent',
             default => 'default',
         };
 
-        $severityEmoji = match (strtolower($severity)) {
+        $severityEmoji = match ($severityLower) {
             'critical', 'emergency', 'alert' => '🔴',
             'error' => '🚨',
             'warning' => '⚠️',
@@ -48,6 +49,7 @@ class TeamsChannel implements AlertChannel
         };
 
         $facts = [
+            ['title' => 'Exception',   'value' => class_basename($exception)],
             ['title' => 'Message',     'value' => $exception->getMessage()],
             ['title' => 'File',        'value' => $exception->getFile() . ':' . $exception->getLine()],
             ['title' => 'Severity',    'value' => ucfirst($severity)],
@@ -79,14 +81,12 @@ class TeamsChannel implements AlertChannel
                                         'wrap' => true,
                                         'weight' => 'Bolder',
                                         'size' => 'Large',
-                                        'color' => 'Light',
                                     ],
                                     [
                                         'type' => 'TextBlock',
-                                        'text' => 'Captured at ' . now()->toDateTimeString(),
+                                        'text' => 'Triggered at ' . now(config('app.timezone'))->toDateTimeString(),
                                         'wrap' => true,
                                         'size' => 'Small',
-                                        'color' => 'Light',
                                         'spacing' => 'None',
                                         'isSubtle' => true,
                                     ],
@@ -102,7 +102,6 @@ class TeamsChannel implements AlertChannel
                                         'text' => strtoupper($severity),
                                         'weight' => 'Bolder',
                                         'size' => 'Small',
-                                        'color' => 'Light',
                                     ],
                                 ],
                             ],
@@ -152,7 +151,7 @@ class TeamsChannel implements AlertChannel
                     ],
                     [
                         'type' => 'FactSet',
-                        'facts' => array_filter($facts, fn ($f) => $f['title'] !== 'Message'),
+                        'facts' => $facts,
                         'spacing' => 'Small',
                     ],
                 ],
@@ -178,9 +177,6 @@ class TeamsChannel implements AlertChannel
 
         $payload = [
             'type' => 'message',
-            'summary' => '🚨 ' . $title . ' — ' . $exception->getMessage(),
-            'text' => '[' . ucfirst($severity) . '] ' . $title . ': ' . $exception->getMessage(),
-            'Attachments' => true,
             'attachments' => [
                 [
                     'contentType' => 'application/vnd.microsoft.card.adaptive',

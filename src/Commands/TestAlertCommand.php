@@ -39,7 +39,7 @@ class TestAlertCommand extends Command
         try {
             $type = $this->option('type');
             $targetChannel = $this->argument('channel');
-            $message = 'AlertStream Test Alert - ' . now();
+            $message = 'AlertStream Test Alert';
 
             $testData = [
                 'environment' => app()->environment(),

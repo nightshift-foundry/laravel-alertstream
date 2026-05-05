@@ -63,6 +63,8 @@ ALERTSTREAM_CHANNELS=teams
 ALERTSTREAM_TEAMS_WEBHOOK=https://your-tenant.webhook.office.com/webhookb2/...
 ```
 
+> **Note:** Teams does not support link previews in webhook messages. The snapshot URL is included as plain text — you won't get the inline card preview you'd see in Slack or Discord. This is a Teams limitation, not a package one.
+
 ### Discord
 
 ```env
