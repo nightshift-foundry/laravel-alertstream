@@ -1,0 +1,19 @@
+# Ensure consistent line endings
+* text=auto
+
+# Export ignore - excluded from dist archives and composer installs
+.env.example export-ignore
+.git export-ignore
+.githooks/ export-ignore
+.github/ export-ignore
+.idea/ export-ignore
+.php-cs-fixer.cache export-ignore
+.php-cs-fixer.dist.php export-ignore
+.phpunit.result.cache export-ignore
+docker/ export-ignore
+phpunit.xml export-ignore
+setup-test-app.sh export-ignore
+tests/ export-ignore
+composer.lock export-ignore
+CHANGELOG.md export-ignore
+
