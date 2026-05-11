@@ -58,12 +58,29 @@ ALERTSTREAM_SLACK_WEBHOOK=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 ### Microsoft Teams
 
+Teams no longer supports direct incoming webhooks the way Slack and Discord do. The reliable approach is a **Power Automate flow** that receives the alert payload and posts it as a formatted chat message.
+
+#### 1. Create the flow
+
+1. Go to [make.powerautomate.com](https://make.powerautomate.com) and create a new **Instant cloud flow**
+2. Choose **"When an HTTP request is received"** as the trigger
+3. Add a **"Post message in a chat or channel"** action — set **Post as** to `Flow bot`, choose your team and channel
+4. Set the **Message** field to the expression:
+   ```
+   triggerBody()?['message']
+   ```
+5. Save the flow — the HTTP trigger URL will appear on the trigger step. Copy it.
+
+#### 2. Configure the package
+
 ```env
 ALERTSTREAM_CHANNELS=teams
-ALERTSTREAM_TEAMS_WEBHOOK=https://your-tenant.webhook.office.com/webhookb2/...
+ALERTSTREAM_TEAMS_WEBHOOK=https://prod-xx.westeurope.logic.azure.com/workflows/...
 ```
 
-> **Note:** Teams does not support link previews in webhook messages. The snapshot URL is included as plain text — you won't get the inline card preview you'd see in Slack or Discord. This is a Teams limitation, not a package one.
+That's it. AlertStream POSTs an HTML-formatted payload to your flow, which passes the message straight through to the channel. The message includes severity-coded colours, bold exception details, file location, environment, and a **View Full Stacktrace** link when snapshots are enabled.
+
+> **Note:** The HTTP trigger URL contains a SAS token and acts as a secret — treat it like a password and store it in your `.env`, never in source control.
 
 ### Discord
 

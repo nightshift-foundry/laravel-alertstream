@@ -26,164 +26,68 @@ class TeamsChannel implements AlertChannel
         $severity = $context['severity'] ?? 'error';
         $severityLower = strtolower($severity);
 
-        $severityStyle = match ($severityLower) {
-            'critical', 'emergency', 'alert', 'error' => 'attention',
-            'warning' => 'warning',
-            'notice', 'info' => 'accent',
-            default => 'emphasis',
+        // ── Severity → hex color ───────────────────────────────────────────────
+        $color = match ($severityLower) {
+            'critical', 'emergency', 'alert' => '#8B0000', // dark red
+            'error' => '#CC0000', // red
+            'warning' => '#E65C00', // orange
+            'notice', 'info' => '#0078D4', // Teams blue
+            'debug' => '#107C10', // green
+            default => '#666666', // grey
         };
 
-        $severityColor = match ($severityLower) {
-            'critical', 'emergency', 'alert', 'error' => 'attention',
-            'warning' => 'warning',
-            'notice', 'info' => 'accent',
-            default => 'default',
-        };
-
-        $severityEmoji = match ($severityLower) {
+        // ── Severity → emoji ───────────────────────────────────────────────────
+        $emoji = match ($severityLower) {
             'critical', 'emergency', 'alert' => '🔴',
             'error' => '🚨',
             'warning' => '⚠️',
             'notice', 'info' => 'ℹ️',
+            'debug' => '🟢',
             default => '🔵',
         };
 
-        $facts = [
-            ['title' => 'Exception',   'value' => class_basename($exception)],
-            ['title' => 'Message',     'value' => $exception->getMessage()],
-            ['title' => 'File',        'value' => $exception->getFile() . ':' . $exception->getLine()],
-            ['title' => 'Severity',    'value' => ucfirst($severity)],
-            ['title' => 'Environment', 'value' => app()->environment() ?? 'unknown'],
-        ];
+        $env = app()->environment() ?? 'unknown';
+        $triggeredAt = now(config('app.timezone'))->toDateTimeString();
+        $file = $exception->getFile() . ':' . $exception->getLine();
+        $exClass = class_basename($exception);
+        $message = htmlspecialchars($exception->getMessage(), ENT_QUOTES | ENT_HTML5);
+
+        // ── HTML message body ──────────────────────────────────────────────────
+        $html = '<div>';
+
+        // Header
+        $html .= '<h2 style="color:' . $color . ';">' . $emoji . ' ' . htmlspecialchars($title, ENT_QUOTES | ENT_HTML5) . '</h2>';
+        $html .= '<p style="color:#666;font-size:12px;">Triggered at ' . $triggeredAt . ' &bull; <strong style="color:' . $color . ';">' . strtoupper($severity) . '</strong></p>';
+        $html .= '<hr/>';
+
+        // Exception class + message
+        $html .= '<p><strong style="color:' . $color . ';">' . htmlspecialchars($exClass, ENT_QUOTES | ENT_HTML5) . '</strong></p>';
+        $html .= '<p>' . $message . '</p>';
+        $html .= '<hr/>';
+
+        // Details table
+        $html .= '<table>';
+        $html .= '<tr><td><strong>File</strong></td><td><code>' . htmlspecialchars($file, ENT_QUOTES | ENT_HTML5) . '</code></td></tr>';
+        $html .= '<tr><td><strong>Severity</strong></td><td style="color:' . $color . ';"><strong>' . ucfirst($severity) . '</strong></td></tr>';
+        $html .= '<tr><td><strong>Environment</strong></td><td>' . htmlspecialchars($env, ENT_QUOTES | ENT_HTML5) . '</td></tr>';
 
         if (! empty($context['url'])) {
-            $facts[] = ['title' => 'URL', 'value' => ($context['method'] ?? 'GET') . ' ' . $context['url']];
+            $url = htmlspecialchars(($context['method'] ?? 'GET') . ' ' . $context['url'], ENT_QUOTES | ENT_HTML5);
+            $html .= '<tr><td><strong>URL</strong></td><td><code>' . $url . '</code></td></tr>';
         }
 
-        $cardBody = [
-            // ── Coloured header band ──────────────────────────────────────
-            [
-                'type' => 'Container',
-                'style' => $severityStyle,
-                'bleed' => true,
-                'spacing' => 'None',
-                'items' => [
-                    [
-                        'type' => 'ColumnSet',
-                        'columns' => [
-                            [
-                                'type' => 'Column',
-                                'width' => 'stretch',
-                                'items' => [
-                                    [
-                                        'type' => 'TextBlock',
-                                        'text' => $severityEmoji . '  ' . $title,
-                                        'wrap' => true,
-                                        'weight' => 'Bolder',
-                                        'size' => 'Large',
-                                    ],
-                                    [
-                                        'type' => 'TextBlock',
-                                        'text' => 'Triggered at ' . now(config('app.timezone'))->toDateTimeString(),
-                                        'wrap' => true,
-                                        'size' => 'Small',
-                                        'spacing' => 'None',
-                                        'isSubtle' => true,
-                                    ],
-                                ],
-                            ],
-                            [
-                                'type' => 'Column',
-                                'width' => 'auto',
-                                'verticalContentAlignment' => 'Center',
-                                'items' => [
-                                    [
-                                        'type' => 'TextBlock',
-                                        'text' => strtoupper($severity),
-                                        'weight' => 'Bolder',
-                                        'size' => 'Small',
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
+        $html .= '</table>';
 
-            // ── Exception message ─────────────────────────────────────────
-            [
-                'type' => 'Container',
-                'style' => 'emphasis',
-                'spacing' => 'Medium',
-                'separator' => true,
-                'items' => [
-                    [
-                        'type' => 'TextBlock',
-                        'text' => 'EXCEPTION',
-                        'weight' => 'Bolder',
-                        'size' => 'Small',
-                        'color' => $severityColor,
-                        'spacing' => 'None',
-                    ],
-                    [
-                        'type' => 'TextBlock',
-                        'text' => $exception->getMessage(),
-                        'wrap' => true,
-                        'spacing' => 'Small',
-                        'isSubtle' => false,
-                    ],
-                ],
-            ],
-
-            // ── Details fact-set ──────────────────────────────────────────
-            [
-                'type' => 'Container',
-                'spacing' => 'Medium',
-                'separator' => true,
-                'items' => [
-                    [
-                        'type' => 'TextBlock',
-                        'text' => 'DETAILS',
-                        'weight' => 'Bolder',
-                        'size' => 'Small',
-                        'color' => $severityColor,
-                        'spacing' => 'None',
-                    ],
-                    [
-                        'type' => 'FactSet',
-                        'facts' => $facts,
-                        'spacing' => 'Small',
-                    ],
-                ],
-            ],
-        ];
-
-        $card = [
-            '$schema' => 'http://adaptivecards.io/schemas/adaptive-card.json',
-            'type' => 'AdaptiveCard',
-            'version' => '1.2',
-            'body' => $cardBody,
-        ];
-
+        // Stacktrace link
         if ($snapshotUrl) {
-            $card['actions'] = [
-                [
-                    'type' => 'Action.OpenUrl',
-                    'title' => 'View Full Stacktrace',
-                    'url' => $snapshotUrl,
-                ],
-            ];
+            $html .= '<hr/>';
+            $html .= '<p>🔗 <a href="' . htmlspecialchars($snapshotUrl, ENT_QUOTES | ENT_HTML5) . '"><strong>View Full Stacktrace</strong></a></p>';
         }
+
+        $html .= '</div>';
 
         $payload = [
-            'type' => 'message',
-            'attachments' => [
-                [
-                    'contentType' => 'application/vnd.microsoft.card.adaptive',
-                    'contentUrl' => null,
-                    'content' => $card,
-                ],
-            ],
+            'message' => $html,
         ];
 
         try {
