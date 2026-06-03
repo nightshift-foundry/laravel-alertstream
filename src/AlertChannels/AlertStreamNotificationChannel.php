@@ -1,6 +1,6 @@
 <?php
 
-namespace NightshiftFoundry\AlertStream\Channels;
+namespace NightshiftFoundry\AlertStream\AlertChannels;
 
 use Illuminate\Notifications\Notification;
 use NightshiftFoundry\AlertStream\Services\AlertStreamService;

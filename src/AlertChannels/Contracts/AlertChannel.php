@@ -1,6 +1,6 @@
 <?php
 
-namespace NightshiftFoundry\AlertStream\Channels\Contracts;
+namespace NightshiftFoundry\AlertStream\AlertChannels\Contracts;
 
 use Throwable;
 

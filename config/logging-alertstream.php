@@ -6,34 +6,42 @@ return [
     | AlertStream Logging Configuration
     |--------------------------------------------------------------------------
     |
-    | This file contains additional logging channel configurations for AlertStream.
-    | Publish this file to your config/logging.php for custom channel setup.
+    | Custom Monolog channel drivers for routing Laravel log messages to
+    | AlertStream destinations.  Copy the entries you need into your
+    | config/logging.php channels array, then reference them by name in
+    | your logging stack or ALERTSTREAM_LOG_CHANNELS.
+    |
+    | Each driver reads its webhook/address from alertstream.log_destinations,
+    | which is keyed by ALERTSTREAM_LOG_* env vars — separate from the alert
+    | channel credentials so you can route logs to a different endpoint.
     |
     */
 
     'channels' => [
-        'alertstream' => [
-            'driver' => 'stack',
-            'channels' => ['single'],
-            'ignore_exceptions' => false,
-        ],
-
-        'alertstream_email' => [
-            'driver' => 'stack',
-            'channels' => ['single', 'mail'],
-            'ignore_exceptions' => false,
-        ],
 
         'alertstream_slack' => [
-            'driver' => 'stack',
-            'channels' => ['single', 'slack'],
-            'ignore_exceptions' => false,
+            'driver' => 'custom',
+            'via' => NightshiftFoundry\AlertStream\LogChannels\SlackLogChannel::class,
+            'level' => 'debug',
         ],
 
-        'alertstream_syslog' => [
-            'driver' => 'syslog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'facility' => env('LOG_SYSLOG_FACILITY', LOG_USER),
+        'alertstream_teams' => [
+            'driver' => 'custom',
+            'via' => NightshiftFoundry\AlertStream\LogChannels\TeamsLogChannel::class,
+            'level' => 'debug',
         ],
+
+        'alertstream_discord' => [
+            'driver' => 'custom',
+            'via' => NightshiftFoundry\AlertStream\LogChannels\DiscordLogChannel::class,
+            'level' => 'debug',
+        ],
+
+        'alertstream_mail' => [
+            'driver' => 'custom',
+            'via' => NightshiftFoundry\AlertStream\LogChannels\MailLogChannel::class,
+            'level' => 'debug',
+        ],
+
     ],
 ];

@@ -1,9 +1,9 @@
 <?php
 
-namespace NightshiftFoundry\AlertStream\Channels;
+namespace NightshiftFoundry\AlertStream\AlertChannels;
 
 use Illuminate\Http\Client\Factory as HttpClient;
-use NightshiftFoundry\AlertStream\Channels\Contracts\AlertChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use Throwable;
 
 class SlackChannel implements AlertChannel

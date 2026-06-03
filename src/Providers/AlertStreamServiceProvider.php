@@ -2,20 +2,22 @@
 
 namespace NightshiftFoundry\AlertStream\Providers;
 
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
-use NightshiftFoundry\AlertStream\Channels\DiscordChannel;
-use NightshiftFoundry\AlertStream\Channels\MailChannel;
-use NightshiftFoundry\AlertStream\Channels\SlackChannel;
-use NightshiftFoundry\AlertStream\Channels\TeamsChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\DiscordChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\MailChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\SlackChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\TeamsChannel;
 use NightshiftFoundry\AlertStream\Commands\PruneSnapshotsCommand;
 use NightshiftFoundry\AlertStream\Commands\TestAlertCommand;
 use NightshiftFoundry\AlertStream\Events\ExceptionCaptured;
 use NightshiftFoundry\AlertStream\Exceptions\Handler;
 use NightshiftFoundry\AlertStream\Listeners\SendExceptionToAlertStream;
+use NightshiftFoundry\AlertStream\LogChannels\TeamsLogChannel;
 use NightshiftFoundry\AlertStream\Services\AlertStreamService;
 use NightshiftFoundry\AlertStream\Services\SnapshotService;
 use Throwable;
@@ -36,12 +38,23 @@ class AlertStreamServiceProvider extends ServiceProvider
 
     /**
      * Register services.
+     *
+     * @throws BindingResolutionException
      */
     public function register(): void
     {
         $this->mergeConfigFrom(
             __DIR__ . '/../../config/alertstream.php',
             'alertstream'
+        );
+
+        $this->app->make('config')->set(
+            'logging.channels.teams',
+            [
+                'driver' => 'custom',
+                'via' => TeamsLogChannel::class,
+                'level' => 'info',
+            ]
         );
 
         $this->app->singleton(AlertStreamService::class, function ($app) {

@@ -40,7 +40,7 @@ Publish the config:
 php artisan vendor:publish --tag=alertstream-config
 ```
 
-## Built-in Channels
+## Built-in AlertChannels
 
 Activate any channel by adding its name to `ALERTSTREAM_CHANNELS` and supplying its credentials. No code changes needed.
 
@@ -103,14 +103,14 @@ Multiple channels at once:
 ALERTSTREAM_CHANNELS=slack,teams,mail
 ```
 
-## Custom Channels
+## Custom AlertChannels
 
 Need PagerDuty, Telegram, OpsGenie, or your own internal system? Implement the `AlertChannel` contract and tag it. AlertStream discovers it automatically alongside the built-in ones.
 
 ### 1. Implement the contract
 
 ```php
-use NightshiftFoundry\AlertStream\Channels\Contracts\AlertChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use Throwable;
 
 class PagerDutyChannel implements AlertChannel
@@ -352,10 +352,10 @@ This publishes the view to `resources/views/vendor/alertstream/snapshots/show.bl
 AlertStream provides two distinct ways to send messages:
 
 | | `report()` | `log()` |
-|---|---|---|
+|---|---|--|
 | **Purpose** | Exception alerts that need human attention | Structured diagnostic / operational log messages |
 | **Writes to log channels** | ✅ | ✅ |
-| **Dispatches to Slack, Teams, Discord, Mail** | ✅ | ✗ |
+| **Dispatches to Slack, Teams, Discord, Mail** | ✅ | ✅ |
 | **Creates snapshots** | ✅ (when enabled) | ✗ |
 | **Subject to throttling / dedup** | ✅ | ✗ |
 | **Accepts a Throwable** | ✅ (second argument) | ✗ |
@@ -520,7 +520,7 @@ Use AlertStream as a native Laravel notification channel and compose alerts with
 
 ```php
 use Illuminate\Notifications\Notification;
-use NightshiftFoundry\AlertStream\Channels\AlertStreamNotificationChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\AlertStreamNotificationChannel;
 
 class PaymentFailed extends Notification
 {
@@ -582,7 +582,7 @@ Response:
 | `queue_connection` | `ALERTSTREAM_QUEUE_CONNECTION` | _(app default)_ | Queue connection |
 | `queue_name` | `ALERTSTREAM_QUEUE_NAME` | `default` | Queue name |
 
-### Channels
+### AlertChannels
 
 | Key | Env | Default | Description |
 |---|---|---|---|
@@ -622,7 +622,7 @@ Response:
 
 ```
 src/
-├── Channels/
+├── AlertChannels/
 │   ├── Contracts/
 │   │   └── AlertChannel.php          <- implement this to add any channel
 │   ├── AlertStreamNotificationChannel.php

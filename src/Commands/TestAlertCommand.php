@@ -5,7 +5,7 @@ namespace NightshiftFoundry\AlertStream\Commands;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Application;
-use NightshiftFoundry\AlertStream\Channels\Contracts\AlertChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use NightshiftFoundry\AlertStream\Services\AlertStreamService;
 use RuntimeException;
 

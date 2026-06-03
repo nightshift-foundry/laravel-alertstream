@@ -4,7 +4,7 @@ namespace NightshiftFoundry\AlertStream\Services;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Log\LogManager;
-use NightshiftFoundry\AlertStream\Channels\Contracts\AlertChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use NightshiftFoundry\AlertStream\Exceptions\AlertStreamException;
 use Throwable;
 

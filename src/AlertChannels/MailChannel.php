@@ -1,9 +1,9 @@
 <?php
 
-namespace NightshiftFoundry\AlertStream\Channels;
+namespace NightshiftFoundry\AlertStream\AlertChannels;
 
 use Illuminate\Contracts\Mail\Mailer;
-use NightshiftFoundry\AlertStream\Channels\Contracts\AlertChannel;
+use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use Throwable;
 
 class MailChannel implements AlertChannel

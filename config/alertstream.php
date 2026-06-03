@@ -15,7 +15,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Log Channels
+    | Log AlertChannels
     |--------------------------------------------------------------------------
     |
     | The Laravel logging channels AlertStream writes to (e.g. "single",
@@ -134,7 +134,7 @@ return [
     */
 
     'throttle' => [
-        'enabled' => env('ALERTSTREAM_THROTTLE', false),
+        'enabled' => env('ALERTSTREAM_THROTTLE', true),
         'max_per_minute' => env('ALERTSTREAM_THROTTLE_MAX', 5),
     ],
 
@@ -166,7 +166,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Channels
+    | AlertChannels
     |--------------------------------------------------------------------------
     |
     | ALERTSTREAM_CHANNELS is a comma-separated list of the alerting channels
@@ -211,6 +211,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Log Channel Destinations
+    |--------------------------------------------------------------------------
+    |
+    | Webhook/mail destinations for the AlertStream Monolog log channel drivers.
+    | These are intentionally separate from the alert channel credentials above
+    | so you can route log messages to a different endpoint than exceptions.
+    |
+    */
+
+    'log_destinations' => [
+
+        'slack' => [
+            'webhook' => env('ALERTSTREAM_LOG_SLACK_WEBHOOK'),
+        ],
+
+        'teams' => [
+            'webhook' => env('ALERTSTREAM_LOG_TEAMS_WEBHOOK'),
+        ],
+
+        'discord' => [
+            'webhook' => env('ALERTSTREAM_LOG_DISCORD_WEBHOOK'),
+        ],
+
+        'mail' => [
+            'to' => env('ALERTSTREAM_LOG_MAIL_TO'),
+            'from' => env('ALERTSTREAM_LOG_MAIL_FROM'),
+        ],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Snapshots
     |--------------------------------------------------------------------------
     |
@@ -241,6 +273,7 @@ return [
 
         // Route prefix and middleware for the snapshot viewer
         'route_prefix' => env('ALERTSTREAM_SNAPSHOTS_ROUTE_PREFIX', 'alertstream'),
+        // Route middleware add 'auth' if you want login-protected access or any other middleware
         'route_middleware' => ['web'],
     ],
 ];
