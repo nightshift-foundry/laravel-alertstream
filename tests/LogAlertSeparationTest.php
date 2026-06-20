@@ -3,6 +3,7 @@
 namespace NightshiftFoundry\AlertStream\Tests;
 
 use Illuminate\Support\Facades\Http;
+use NightshiftFoundry\AlertStream\Enums\AlertStreamLogLevel;
 use NightshiftFoundry\AlertStream\Providers\AlertStreamServiceProvider;
 use NightshiftFoundry\AlertStream\Services\AlertStreamService;
 use Orchestra\Testbench\TestCase;
@@ -65,6 +66,24 @@ class LogAlertSeparationTest extends TestCase
 
         $this->assertSame(1, $this->countRequestsTo(self::LOG_WEBHOOK));
         $this->assertSame(0, $this->countRequestsTo(self::ALERT_WEBHOOK));
+    }
+
+    /**
+     * log() accepts an AlertStreamLogLevel enum case in place of the string level.
+     */
+    public function test_log_accepts_enum_level(): void
+    {
+        Http::fake([
+            '*' => Http::response('ok', 200),
+        ]);
+
+        $this->app->make(AlertStreamService::class)
+            ->log(AlertStreamLogLevel::INFO, 'hello');
+
+        Http::assertSent(fn ($request) => $request->url() === self::LOG_WEBHOOK);
+        Http::assertNotSent(fn ($request) => $request->url() === self::ALERT_WEBHOOK);
+
+        $this->assertSame(1, $this->countRequestsTo(self::LOG_WEBHOOK));
     }
 
     /**

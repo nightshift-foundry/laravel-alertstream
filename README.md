@@ -378,33 +378,37 @@ AlertStream::report('Payment gateway timeout', $exception, ['order_id' => 42]);
 For operational visibility, diagnostics, and auditing, use `log()`. It writes to the `alertstream` file **and** delivers to the log webhook channels you select via `ALERTSTREAM_LOG_CHANNELS`. It does **not** dispatch to the alert channels, create snapshots, or go through throttling.
 
 ```php
-AlertStream::log(string $level, string $message, mixed $data = null, array $context = []);
+AlertStream::log(string|AlertStreamLogLevel $level, string $message, mixed $data = null, array $context = []);
 ```
 
-The `$level` parameter accepts any log level that Laravel supports (the standard PSR-3 levels):
+The `$level` parameter accepts the `AlertStreamLogLevel` enum (recommended) or any equivalent log level string that Laravel supports (the standard PSR-3 levels):
 
-| Level | Typical use |
-|---|---|
-| `emergency` | System is unusable |
-| `critical` | Critical conditions |
-| `alert` | Action must be taken immediately |
-| `error` | Runtime errors that don't require immediate action |
-| `warning` | Exceptional occurrences that are not errors |
-| `notice` | Normal but significant events |
-| `info` | Interesting events (user login, scheduled job ran) |
-| `debug` | Detailed debug information |
+| `AlertStreamLogLevel` case | String | Typical use |
+|---|---|---|
+| `AlertStreamLogLevel::EMERGENCY` | `emergency` | System is unusable |
+| `AlertStreamLogLevel::ALERT` | `alert` | Action must be taken immediately |
+| `AlertStreamLogLevel::CRITICAL` | `critical` | Critical conditions |
+| `AlertStreamLogLevel::ERROR` | `error` | Runtime errors that don't require immediate action |
+| `AlertStreamLogLevel::WARNING` | `warning` | Exceptional occurrences that are not errors |
+| `AlertStreamLogLevel::NOTICE` | `notice` | Normal but significant events |
+| `AlertStreamLogLevel::INFO` | `info` | Interesting events (user login, scheduled job ran) |
+| `AlertStreamLogLevel::DEBUG` | `debug` | Detailed debug information |
 
 Examples:
 
 ```php
+use NightshiftFoundry\AlertStream\Enums\AlertStreamLogLevel;
 use NightshiftFoundry\AlertStream\Facades\AlertStream;
 
-AlertStream::log('debug', 'Slow query detected', ['sql' => $query, 'time_ms' => 320]);
-AlertStream::log('info', 'User exported report', ['user_id' => $user->id, 'rows' => 1_200]);
-AlertStream::log('warning', 'Disk usage above 80%', ['disk' => '/dev/sda1', 'usage' => '82%']);
-AlertStream::log('error', 'Redis connection lost, falling back to file cache');
-AlertStream::log('critical', 'Queue worker stalled', ['queue' => 'payments', 'pending' => 847]);
-AlertStream::log('emergency', 'All database connections exhausted');
+AlertStream::log(AlertStreamLogLevel::DEBUG, 'Slow query detected', ['sql' => $query, 'time_ms' => 320]);
+AlertStream::log(AlertStreamLogLevel::INFO, 'User exported report', ['user_id' => $user->id, 'rows' => 1_200]);
+AlertStream::log(AlertStreamLogLevel::WARNING, 'Disk usage above 80%', ['disk' => '/dev/sda1', 'usage' => '82%']);
+AlertStream::log(AlertStreamLogLevel::ERROR, 'Redis connection lost, falling back to file cache');
+AlertStream::log(AlertStreamLogLevel::CRITICAL, 'Queue worker stalled', ['queue' => 'payments', 'pending' => 847]);
+AlertStream::log(AlertStreamLogLevel::EMERGENCY, 'All database connections exhausted');
+
+// Plain PSR-3 strings are still accepted for backward compatibility:
+AlertStream::log('info', 'User exported report', ['user_id' => $user->id]);
 ```
 
 A `debug()` convenience method is also available as a shorthand:

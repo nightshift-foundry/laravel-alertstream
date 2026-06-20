@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static void report(string $message, ?\Throwable $exception = null, array $context = [])
- * @method static void log(string $level, string $message, $data = null, array $context = [])
+ * @method static void log(string|\NightshiftFoundry\AlertStream\Enums\AlertStreamLogLevel $level, string $message, $data = null, array $context = [])
  * @method static void debug(string $message, $data = null, array $context = [])
  * @method static mixed getConfig(string $key, $default = null)
  *

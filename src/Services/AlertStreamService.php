@@ -5,6 +5,7 @@ namespace NightshiftFoundry\AlertStream\Services;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Log\LogManager;
 use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
+use NightshiftFoundry\AlertStream\Enums\AlertStreamLogLevel;
 use NightshiftFoundry\AlertStream\Exceptions\AlertStreamException;
 use Throwable;
 
@@ -107,19 +108,22 @@ class AlertStreamService
      *
      * Accepts any log level supported by Laravel / PSR-3:
      * emergency, alert, critical, error, warning, notice, info, debug.
+     * An AlertStreamLogLevel enum case may be passed in place of the string.
      *
-     * @param string $level Any PSR-3 log level string
+     * @param string|AlertStreamLogLevel $level Any PSR-3 log level string, or an AlertStreamLogLevel case
      * @param string $message
      * @param mixed $data
      * @param array $context
      *
      * @throws AlertStreamException
      */
-    public function log(string $level, string $message, $data = null, array $context = []): void
+    public function log(string|AlertStreamLogLevel $level, string $message, $data = null, array $context = []): void
     {
         if (! $this->config['enabled']) {
             throw new AlertStreamException('AlertStream is not enabled. Check your ALERTSTREAM_ENABLED environment variable.');
         }
+
+        $level = $level instanceof AlertStreamLogLevel ? $level->value : $level;
 
         $logData = array_merge([
             'timestamp' => now(),
@@ -142,7 +146,7 @@ class AlertStreamService
      */
     public function debug(string $message, $data = null, array $context = []): void
     {
-        $this->log('debug', $message, $data, $context);
+        $this->log(AlertStreamLogLevel::DEBUG, $message, $data, $context);
     }
 
     /**
