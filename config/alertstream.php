@@ -18,13 +18,23 @@ return [
     | Log AlertChannels
     |--------------------------------------------------------------------------
     |
-    | The Laravel logging channels AlertStream writes to (e.g. "single",
-    | "daily", a custom stack).  These are defined in config/logging.php and
-    | are separate from the alerting channels below.
+    | ALERTSTREAM_LOG_CHANNELS is a comma-separated list of channel NAMES that
+    | log() delivers to — mirroring the vocabulary of channels.active below.
+    |
+    |   ALERTSTREAM_LOG_CHANNELS=slack,teams,discord,mail
+    |
+    | Each name maps to the auto-registered `alertstream_<name>` Monolog driver
+    | and reads its destination from log_destinations.* (ALERTSTREAM_LOG_* env
+    | vars), falling back to the matching channels.* webhook when unset.
+    |
+    | Logs are ALWAYS also written to the auto-registered `alertstream` file
+    | channel (storage/logs/alertstream.log), so leaving this empty still keeps
+    | a local record. This is independent of the alert channels above, so an
+    | exception reported via report() is never delivered through a log webhook.
     |
     */
 
-    'log_channels' => explode(',', env('ALERTSTREAM_LOG_CHANNELS', 'single')),
+    'log_channels' => array_filter(explode(',', env('ALERTSTREAM_LOG_CHANNELS', ''))),
 
     /*
     |--------------------------------------------------------------------------

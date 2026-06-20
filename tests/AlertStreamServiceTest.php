@@ -35,7 +35,7 @@ class AlertStreamServiceTest extends TestCase
     {
         $config = $this->app['config']->get('alertstream');
         $this->assertTrue($config['enabled']);
-        $this->assertContains('single', $config['log_channels']);
+        $this->assertContains('teams', $config['log_channels']);
     }
 
     /**
@@ -71,6 +71,6 @@ class AlertStreamServiceTest extends TestCase
     protected function defineEnvironment($app): void
     {
         $app['config']->set('alertstream.enabled', true);
-        $app['config']->set('alertstream.log_channels', ['single']);
+        $app['config']->set('alertstream.log_channels', ['teams']);
     }
 }

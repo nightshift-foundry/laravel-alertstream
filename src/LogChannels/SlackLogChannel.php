@@ -90,7 +90,7 @@ class SlackLogChannel extends AbstractProcessingHandler implements LogChannel
         ];
 
         try {
-            $http = new HttpClient();
+            $http = app(HttpClient::class);
             $http->timeout(5)->retry(2, 200)->post($webhook, ['blocks' => $blocks]);
         } catch (Throwable) {
             // Swallow send errors — logging must never crash the application.

@@ -17,6 +17,9 @@ use NightshiftFoundry\AlertStream\Commands\TestAlertCommand;
 use NightshiftFoundry\AlertStream\Events\ExceptionCaptured;
 use NightshiftFoundry\AlertStream\Exceptions\Handler;
 use NightshiftFoundry\AlertStream\Listeners\SendExceptionToAlertStream;
+use NightshiftFoundry\AlertStream\LogChannels\DiscordLogChannel;
+use NightshiftFoundry\AlertStream\LogChannels\MailLogChannel;
+use NightshiftFoundry\AlertStream\LogChannels\SlackLogChannel;
 use NightshiftFoundry\AlertStream\LogChannels\TeamsLogChannel;
 use NightshiftFoundry\AlertStream\Services\AlertStreamService;
 use NightshiftFoundry\AlertStream\Services\SnapshotService;
@@ -48,14 +51,7 @@ class AlertStreamServiceProvider extends ServiceProvider
             'alertstream'
         );
 
-        $this->app->make('config')->set(
-            'logging.channels.teams',
-            [
-                'driver' => 'custom',
-                'via' => TeamsLogChannel::class,
-                'level' => 'info',
-            ]
-        );
+        $this->registerLogChannels();
 
         $this->app->singleton(AlertStreamService::class, function ($app) {
             return new AlertStreamService(
@@ -120,6 +116,58 @@ class AlertStreamServiceProvider extends ServiceProvider
             }
 
             $this->commands($commands);
+        }
+    }
+
+    /**
+     * Register the AlertStream logging channels.
+     *
+     * Registration is conditional: a channel is only defined when the host
+     * application has not already declared it, so every channel stays fully
+     * overridable from the app's own config/logging.php.
+     *
+     * - alertstream: the always-on daily file channel both report() and log()
+     *   write to (storage/logs/alertstream.log).
+     * - alertstream_<name>: custom Monolog drivers used by log() when the
+     *   matching short name is listed in ALERTSTREAM_LOG_CHANNELS.
+     */
+    protected function registerLogChannels(): void
+    {
+        $config = $this->app->make('config');
+
+        $channels = [
+            'logging.channels.alertstream' => [
+                'driver' => 'daily',
+                'path' => storage_path('logs/alertstream.log'),
+                'level' => 'debug',
+                'days' => 14,
+            ],
+            'logging.channels.alertstream_slack' => [
+                'driver' => 'custom',
+                'via' => SlackLogChannel::class,
+                'level' => 'debug',
+            ],
+            'logging.channels.alertstream_teams' => [
+                'driver' => 'custom',
+                'via' => TeamsLogChannel::class,
+                'level' => 'debug',
+            ],
+            'logging.channels.alertstream_discord' => [
+                'driver' => 'custom',
+                'via' => DiscordLogChannel::class,
+                'level' => 'debug',
+            ],
+            'logging.channels.alertstream_mail' => [
+                'driver' => 'custom',
+                'via' => MailLogChannel::class,
+                'level' => 'debug',
+            ],
+        ];
+
+        foreach ($channels as $key => $definition) {
+            if (! $config->has($key)) {
+                $config->set($key, $definition);
+            }
         }
     }
 

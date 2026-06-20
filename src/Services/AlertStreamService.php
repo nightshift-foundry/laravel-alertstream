@@ -48,10 +48,14 @@ class AlertStreamService
     /**
      * Report an alert with full stacktrace.
      *
-     * This is the primary method for exception-based alerts. It writes to
-     * your configured log channels AND dispatches notifications to all
+     * This is the primary method for exception-based alerts. It writes to the
+     * always-on `alertstream` file channel AND dispatches notifications to all
      * active alert channels (Slack, Teams, Discord, Mail, etc.).
      * Snapshots, throttling, and deduplication all apply.
+     *
+     * Note: report() intentionally does NOT write to the log webhook channels
+     * (ALERTSTREAM_LOG_CHANNELS). Those belong exclusively to log() so that an
+     * exception is never delivered twice via two separate webhooks.
      *
      * @param string $message
      * @param Throwable|null $exception
@@ -64,8 +68,6 @@ class AlertStreamService
         if (! $this->config['enabled']) {
             throw new AlertStreamException('AlertStream is not enabled. Check your ALERTSTREAM_ENABLED environment variable.');
         }
-
-        $logChannels = $this->config['log_channels'] ?? ['single'];
 
         $logData = array_merge([
             'timestamp' => now(),
@@ -83,9 +85,10 @@ class AlertStreamService
             ];
         }
 
-        foreach ($logChannels as $logChannel) {
-            $this->log->channel($logChannel)->alert($message, $logData);
-        }
+        // Exceptions are written to the dedicated alertstream file only — the
+        // log webhook channels are reserved for log(). Notification delivery
+        // happens through the tagged AlertChannels below.
+        $this->log->channel('alertstream')->alert($message, $logData);
 
         // Dispatch to every tagged AlertChannel (Slack, Teams, Discord, Mail, …).
         // Custom channels registered by the host app are discovered here too.
@@ -97,9 +100,10 @@ class AlertStreamService
     /**
      * Log a structured message at the given level.
      *
-     * Writes to your configured Laravel log channels ONLY — does NOT
-     * dispatch to notification channels (Slack, Teams, etc.) and does
-     * NOT create snapshots. Use report() when you need channel notifications.
+     * Writes to the always-on `alertstream` file channel AND to the log
+     * webhook channels selected via ALERTSTREAM_LOG_CHANNELS (Slack, Teams,
+     * Discord, Mail). It does NOT create snapshots or go through throttling.
+     * Use report() when you need exception notifications to the alert channels.
      *
      * Accepts any log level supported by Laravel / PSR-3:
      * emergency, alert, critical, error, warning, notice, info, debug.
@@ -117,14 +121,12 @@ class AlertStreamService
             throw new AlertStreamException('AlertStream is not enabled. Check your ALERTSTREAM_ENABLED environment variable.');
         }
 
-        $logChannels = $this->config['log_channels'] ?? ['single'];
-
         $logData = array_merge([
             'timestamp' => now(),
             'data' => $data,
         ], $context);
 
-        foreach ($logChannels as $logChannel) {
+        foreach ($this->resolveLogChannels() as $logChannel) {
             $this->log->channel($logChannel)->$level($message, $logData);
         }
     }
@@ -154,6 +156,33 @@ class AlertStreamService
     public function getConfig(string $key, $default = null)
     {
         return $this->config[$key] ?? $default;
+    }
+
+    /**
+     * Resolve the Laravel logging channels that log() writes to.
+     *
+     * Always includes the dedicated `alertstream` file channel, plus one
+     * `alertstream_<name>` webhook channel for every short name configured in
+     * ALERTSTREAM_LOG_CHANNELS (slack, teams, discord, mail) — mirroring the
+     * vocabulary of the alert channels. The result is de-duplicated.
+     *
+     * @return array<int, string>
+     */
+    protected function resolveLogChannels(): array
+    {
+        $channels = ['alertstream'];
+
+        foreach ($this->config['log_channels'] ?? [] as $name) {
+            $name = trim((string) $name);
+
+            if ($name === '') {
+                continue;
+            }
+
+            $channels[] = 'alertstream_' . $name;
+        }
+
+        return array_values(array_unique($channels));
     }
 
     /**

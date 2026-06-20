@@ -1,0 +1,85 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/AlertChannels/DiscordChannel.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/AlertChannels/MailChannel.php
+
+		-
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/AlertChannels/MailChannel.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/AlertChannels/SlackChannel.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/AlertChannels/TeamsChannel.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Foundation\\Auth\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Exceptions/Handler.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>email" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Exceptions/Handler.php
+
+		-
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Http/Controllers/SnapshotController.php
+
+		-
+			message: '#^Match arm comparison between ''debug'' and ''debug'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: src/LogChannels/DiscordLogChannel.php
+
+		-
+			message: '#^Match arm comparison between ''debug'' and ''debug'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: src/LogChannels/SlackLogChannel.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/LogChannels/TeamsLogChannel.php
+
+		-
+			message: '#^Match arm comparison between ''debug'' and ''debug'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 2
+			path: src/LogChannels/TeamsLogChannel.php
+
+		-
+			message: '#^Access to an undefined property NightshiftFoundry\\AlertStream\\Models\\Snapshot\:\:\$hash\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Models/Snapshot.php
+
+		-
+			message: '#^Call to function method_exists\(\) with NunoMaduro\\Collision\\Adapters\\Laravel\\ExceptionHandler and ''reportable'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Providers/AlertStreamServiceProvider.php

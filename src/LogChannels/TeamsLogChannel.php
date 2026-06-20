@@ -75,7 +75,7 @@ class TeamsLogChannel extends AbstractProcessingHandler implements LogChannel
         $html .= '</div>';
 
         try {
-            $http = new HttpClient();
+            $http = app(HttpClient::class);
             $http->timeout(5)->retry(2, 200)->post($webhook, ['message' => $html]);
         } catch (Throwable) {
             // Swallow send errors — logging must never crash the application.

@@ -24,6 +24,5 @@ composer analyse     # PHPStan static analysis
 ## Gotchas
 
 - Pre-commit hook auto-installs via `composer install` (hooks path: `.githooks/`)
-- `src/Channels/` is legacy — active code lives in `src/AlertChannels/`
 - `setup-test-app.sh` bootstraps a real Laravel app for integration testing
 - Snapshots feature requires a DB migration (`alertstream_snapshots` table)

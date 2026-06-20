@@ -351,18 +351,21 @@ This publishes the view to `resources/views/vendor/alertstream/snapshots/show.bl
 
 AlertStream provides two distinct ways to send messages:
 
+AlertStream keeps these two pipelines fully separate so an exception is never delivered twice. `report()` talks to the **alert** channels; `log()` talks to the **log** channels. Both also write to the always-on `alertstream` file (`storage/logs/alertstream.log`).
+
 | | `report()` | `log()` |
 |---|---|--|
 | **Purpose** | Exception alerts that need human attention | Structured diagnostic / operational log messages |
-| **Writes to log channels** | ✅ | ✅ |
-| **Dispatches to Slack, Teams, Discord, Mail** | ✅ | ✅ |
+| **Writes to the `alertstream` file** | ✅ | ✅ |
+| **Dispatches to ALERT channels** (`ALERTSTREAM_CHANNELS`) | ✅ | ✗ |
+| **Dispatches to LOG channels** (`ALERTSTREAM_LOG_CHANNELS`) | ✗ | ✅ |
 | **Creates snapshots** | ✅ (when enabled) | ✗ |
 | **Subject to throttling / dedup** | ✅ | ✗ |
 | **Accepts a Throwable** | ✅ (second argument) | ✗ |
 
 ### `report()` - exception alerts
 
-Use `report()` when something goes wrong and someone should know about it. The message is written to your configured Laravel log channels **and** dispatched to every active notification channel (Slack, Teams, Discord, Mail, or any custom channel). Snapshots, throttling, and deduplication all apply.
+Use `report()` when something goes wrong and someone should know about it. The message is written to the `alertstream` file **and** dispatched to every active alert channel (`ALERTSTREAM_CHANNELS`: Slack, Teams, Discord, Mail, or any custom channel). It does **not** touch the log webhook channels. Snapshots, throttling, and deduplication all apply.
 
 ```php
 use NightshiftFoundry\AlertStream\Facades\AlertStream;
@@ -372,7 +375,7 @@ AlertStream::report('Payment gateway timeout', $exception, ['order_id' => 42]);
 
 ### `log()` - structured logging at any level
 
-For operational visibility, diagnostics, and auditing, use `log()`. It writes to your configured Laravel log channels **only** and does **not** trigger notifications, create snapshots, or go through throttling.
+For operational visibility, diagnostics, and auditing, use `log()`. It writes to the `alertstream` file **and** delivers to the log webhook channels you select via `ALERTSTREAM_LOG_CHANNELS`. It does **not** dispatch to the alert channels, create snapshots, or go through throttling.
 
 ```php
 AlertStream::log(string $level, string $message, mixed $data = null, array $context = []);
@@ -413,7 +416,33 @@ AlertStream::log('debug', 'Cache miss', ['key' => 'user:42']);
 ```
 
 > **When should I use `report()` vs `log()`?**
-> Use `report()` when you have a caught exception and want the team notified via Slack/Teams/Discord/Mail. Use `log()` for everything else. It gives you structured, levelled logging through AlertStream's configured channels without triggering external notifications.
+> Use `report()` when you have a caught exception and want the team notified via the alert channels (`ALERTSTREAM_CHANNELS`). Use `log()` for structured, levelled operational messages — it delivers to its own, separate set of log channels (`ALERTSTREAM_LOG_CHANNELS`).
+
+### Symmetric alert vs log delivery
+
+`report()` and `log()` use two parallel, independent pipelines. The same exception is therefore never delivered through two different webhooks.
+
+| | Exceptions — `report()` | Logs — `log()` |
+|---|---|---|
+| Active list env | `ALERTSTREAM_CHANNELS` | `ALERTSTREAM_LOG_CHANNELS` |
+| Per-channel webhook env | `ALERTSTREAM_<NAME>_WEBHOOK` | `ALERTSTREAM_LOG_<NAME>_WEBHOOK` |
+| Channel classes | `src/AlertChannels/` | `src/LogChannels/` |
+
+Both lists accept the same vocabulary of channel names: `slack`, `teams`, `discord`, `mail`.
+
+```dotenv
+# Exceptions go to this Teams channel:
+ALERTSTREAM_CHANNELS=teams
+ALERTSTREAM_TEAMS_WEBHOOK=https://outlook.office.com/webhook/AAA
+
+# Logs go to a *different* Teams channel:
+ALERTSTREAM_LOG_CHANNELS=teams
+ALERTSTREAM_LOG_TEAMS_WEBHOOK=https://outlook.office.com/webhook/BBB
+```
+
+A `daily` file channel named `alertstream` (→ `storage/logs/alertstream.log`) is auto-registered and **always** written to by both `report()` and `log()`, so you keep a local record even with no webhooks configured. All auto-registered channels are only defined when your app hasn't already declared a channel of the same name, so they remain fully overridable in `config/logging.php`.
+
+**Webhook fallback:** if a `ALERTSTREAM_LOG_<NAME>_WEBHOOK` is unset, `log()` falls back to the matching `ALERTSTREAM_<NAME>_WEBHOOK`. This is safe because `report()` never delivers through the log channels — so a single webhook can serve both paths if you don't want to split them.
 
 ### Dependency injection
 

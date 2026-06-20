@@ -58,7 +58,7 @@ class DiscordLogChannel extends AbstractProcessingHandler implements LogChannel
         }
 
         try {
-            $http = new HttpClient();
+            $http = app(HttpClient::class);
             $http->timeout(5)->retry(2, 200)->post($webhook, [
                 'embeds' => [
                     [
