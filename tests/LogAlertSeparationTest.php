@@ -87,9 +87,11 @@ class LogAlertSeparationTest extends TestCase
     }
 
     /**
-     * When the log webhook is unset, log() falls back to the alert webhook.
+     * When the log webhook is unset, log() must NOT fall back to the alert
+     * webhook — that would silently merge the two streams onto one
+     * destination and defeat the point of having separate pipelines.
      */
-    public function test_log_falls_back_to_alert_webhook_when_log_webhook_unset(): void
+    public function test_log_does_not_fall_back_to_alert_webhook_when_log_webhook_unset(): void
     {
         $this->app['config']->set('alertstream.log_destinations.teams.webhook', null);
         $this->app['config']->set('alertstream.channels.teams.webhook', self::ALERT_WEBHOOK);
@@ -101,8 +103,42 @@ class LogAlertSeparationTest extends TestCase
         $this->app->make(AlertStreamService::class)
             ->log('info', 'hi');
 
-        Http::assertSent(fn ($request) => $request->url() === self::ALERT_WEBHOOK);
-        $this->assertSame(1, $this->countRequestsTo(self::ALERT_WEBHOOK));
+        Http::assertNotSent(fn ($request) => $request->url() === self::ALERT_WEBHOOK);
+        $this->assertSame(0, $this->countRequestsTo(self::ALERT_WEBHOOK));
+    }
+
+    /**
+     * report() must only write to the `alertstream` file channel — never to
+     * `alertstream_log`, which is exclusive to log(). Regression test for a
+     * bug where both methods shared a single file channel, so exceptions
+     * reported via report() showed up in the same file log() wrote to.
+     */
+    public function test_report_never_writes_to_the_log_file_channel(): void
+    {
+        Http::fake(['*' => Http::response('ok', 200)]);
+        $recorder = $this->bindChannelRecordingLogger();
+
+        $this->app->make(AlertStreamService::class)
+            ->report('Boom', new RuntimeException('boom'), ['order_id' => 7]);
+
+        $this->assertContains('alertstream', $recorder->requestedChannels);
+        $this->assertNotContains('alertstream_log', $recorder->requestedChannels);
+    }
+
+    /**
+     * log() must only write to the `alertstream_log` file channel — never to
+     * `alertstream`, which is exclusive to report().
+     */
+    public function test_log_never_writes_to_the_report_file_channel(): void
+    {
+        Http::fake(['*' => Http::response('ok', 200)]);
+        $recorder = $this->bindChannelRecordingLogger();
+
+        $this->app->make(AlertStreamService::class)
+            ->log('info', 'hello');
+
+        $this->assertContains('alertstream_log', $recorder->requestedChannels);
+        $this->assertNotContains('alertstream', $recorder->requestedChannels);
     }
 
     /**
@@ -136,6 +172,36 @@ class LogAlertSeparationTest extends TestCase
         // Log pipeline: Teams selected, distinct webhook B.
         $app['config']->set('alertstream.log_channels', ['teams']);
         $app['config']->set('alertstream.log_destinations.teams.webhook', self::LOG_WEBHOOK);
+    }
+
+    /**
+     * Replaces the bound LogManager with a subclass that just records which
+     * channel names were requested, so we can assert on that list directly
+     * instead of fighting Mockery spy/expectation interactions. AlertStreamService
+     * type-hints the concrete LogManager class, so the stub must extend it.
+     */
+    private function bindChannelRecordingLogger(): object
+    {
+        $recorder = new class ($this->app) extends \Illuminate\Log\LogManager {
+            public array $requestedChannels = [];
+
+            public function channel($channel = null): static
+            {
+                $this->requestedChannels[] = $channel;
+
+                return $this;
+            }
+
+            public function __call($method, $parameters): void
+            {
+                // Swallow level calls (alert(), info(), etc.) — only the
+                // channel() name matters for this test.
+            }
+        };
+
+        $this->app->instance('log', $recorder);
+
+        return $recorder;
     }
 
     /**

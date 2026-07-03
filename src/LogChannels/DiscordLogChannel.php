@@ -26,8 +26,7 @@ class DiscordLogChannel extends AbstractProcessingHandler implements LogChannel
 
     protected function write(LogRecord $record): void
     {
-        $webhook = Config::get('alertstream.log_destinations.discord.webhook')
-            ?: Config::get('alertstream.channels.discord.webhook');
+        $webhook = Config::get('alertstream.log_destinations.discord.webhook');
 
         if (empty($webhook)) {
             return;

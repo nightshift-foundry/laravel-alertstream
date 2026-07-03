@@ -20,7 +20,7 @@ No configuration required for exception reporting, queue-friendly, and runs comp
 - ⚡  **Queue-friendly** - runs async via a queue worker by default, or inline synchronously if preferred
 - 📋 **Rich context** - exception class, severity, URL, user ID, IP, user agent, environment
 - 📸 **Snapshots** - persist exceptions to the database with a secure, hash-based URL for full stacktrace viewing
-- 🛡️ **Throttling** - prevent alert storms by limiting duplicates per minute
+- 🛡️ **Throttling** - cap alerts per exception fingerprint within a configurable cooldown window
 - 🔗 **Deduplication** - group identical exceptions into a single snapshot with occurrence count
 - 🎯 **Severity mapping** - override auto-detected severity per exception class via config
 - 🧩 **Context enrichers** - plug in custom callables to add tenant ID, git SHA, or any data to every alert
@@ -431,6 +431,7 @@ AlertStream::log('debug', 'Cache miss', ['key' => 'user:42']);
 | Active list env | `ALERTSTREAM_CHANNELS` | `ALERTSTREAM_LOG_CHANNELS` |
 | Per-channel webhook env | `ALERTSTREAM_<NAME>_WEBHOOK` | `ALERTSTREAM_LOG_<NAME>_WEBHOOK` |
 | Channel classes | `src/AlertChannels/` | `src/LogChannels/` |
+| Local file channel | `alertstream` (`storage/logs/alertstream.log`) | `alertstream_log` (`storage/logs/alertstream-log.log`) |
 
 Both lists accept the same vocabulary of channel names: `slack`, `teams`, `discord`, `mail`.
 
@@ -444,9 +445,9 @@ ALERTSTREAM_LOG_CHANNELS=teams
 ALERTSTREAM_LOG_TEAMS_WEBHOOK=https://outlook.office.com/webhook/BBB
 ```
 
-A `daily` file channel named `alertstream` (→ `storage/logs/alertstream.log`) is auto-registered and **always** written to by both `report()` and `log()`, so you keep a local record even with no webhooks configured. All auto-registered channels are only defined when your app hasn't already declared a channel of the same name, so they remain fully overridable in `config/logging.php`.
+Two `daily` file channels are auto-registered so you keep a local record even with no webhooks configured — and, importantly, so the file trail mirrors the same separation as the webhooks: `alertstream` (→ `storage/logs/alertstream.log`) is written to **only** by `report()`, and `alertstream_log` (→ `storage/logs/alertstream-log.log`) is written to **only** by `log()`. Neither method ever writes to the other's file. All auto-registered channels are only defined when your app hasn't already declared a channel of the same name, so they remain fully overridable in `config/logging.php`.
 
-**Webhook fallback:** if a `ALERTSTREAM_LOG_<NAME>_WEBHOOK` is unset, `log()` falls back to the matching `ALERTSTREAM_<NAME>_WEBHOOK`. This is safe because `report()` never delivers through the log channels — so a single webhook can serve both paths if you don't want to split them.
+**No shared destinations:** each `ALERTSTREAM_LOG_<NAME>_WEBHOOK` must be set explicitly. There is no fallback to `ALERTSTREAM_<NAME>_WEBHOOK` — if a log destination is unset, `log()` silently skips that channel rather than reusing the alert webhook. This keeps the two streams fully independent: exception alerts from `report()` never show up where you're only expecting `log()` output.
 
 ### Dependency injection
 
@@ -471,27 +472,33 @@ class OrderService
 ### Artisan test command
 
 ```bash
-php artisan alertstream:test                  # test all enabled channels (sends a report)
-php artisan alertstream:test slack            # test only the Slack channel
-php artisan alertstream:test discord          # test only Discord
-php artisan alertstream:test --type=debug     # test debug log path
-php artisan alertstream:test --type=info      # test info log path
-php artisan alertstream:test --type=warning   # test warning log path
-php artisan alertstream:test --type=error     # test error log path
+php artisan alertstream:test                  # test all active alert channels (sends a report)
+php artisan alertstream:test slack            # test only the Slack ALERT channel (report())
+php artisan alertstream:test discord          # test only the Discord ALERT channel (report())
+
+php artisan alertstream:test --type=debug     # test the debug log path, all configured log channels
+php artisan alertstream:test --type=info      # test the info log path, all configured log channels
+php artisan alertstream:test --type=warning   # test the warning log path, all configured log channels
+php artisan alertstream:test --type=error     # test the error log path, all configured log channels
+
+php artisan alertstream:test teams --type=info    # test ONLY the Teams LOG channel (log()), isolated from the Teams alert channel
 ```
 
 The `--type` flag accepts any log level string and defaults to `alert` (which triggers `report()`). Any other value is passed directly to `log()` at that level.
 
+Pairing `channel` with `--type` targets exactly one destination in exactly one pipeline — `alertstream:test teams` only ever touches the Teams entry under `ALERTSTREAM_CHANNELS`/`ALERTSTREAM_TEAMS_WEBHOOK`, while `alertstream:test teams --type=info` only ever touches the Teams entry under `ALERTSTREAM_LOG_CHANNELS`/`ALERTSTREAM_LOG_TEAMS_WEBHOOK`. The command's status report at the end always lists both pipelines separately, so you can confirm each destination is configured (and that neither is silently reusing the other's webhook) in one run.
+
 ## Throttling
 
-Prevent alert storms when the same exception fires hundreds of times in a short window. Enable throttling to limit how many alerts per exception (same class + file + line) are sent per minute.
+Cap alerts for the same exception (same class + file + line) — whether it fires a hundred times in a burst, or recurs every few minutes forever. The first occurrence opens a fixed window lasting `ALERTSTREAM_THROTTLE_COOLDOWN_MINUTES` and always alerts. Up to `ALERTSTREAM_THROTTLE_MAX` occurrences total are allowed inside that same window; once the cap is hit, every further occurrence is silently dropped until the window elapses, then the next occurrence alerts again and opens a fresh window.
 
 ```env
 ALERTSTREAM_THROTTLE=true
-ALERTSTREAM_THROTTLE_MAX=5            # alerts per minute per exception fingerprint
+ALERTSTREAM_THROTTLE_MAX=5                    # at most 5 alerts per exception fingerprint...
+ALERTSTREAM_THROTTLE_COOLDOWN_MINUTES=60      # ...per 60-minute window
 ```
 
-When the limit is hit, additional occurrences are silently dropped until the window resets. Snapshots (if enabled) still record every occurrence via dedup, but only the channel notifications are throttled.
+The window is fixed — it's set once, on the first occurrence, and never extended by later ones — so a bug recurring every few minutes forever is still capped at `ALERTSTREAM_THROTTLE_MAX` alerts per window, not delivered on every single occurrence. Snapshots (if enabled) still record every occurrence via `dedup_minutes`, but only the channel notifications are throttled.
 
 ## Severity Mapping
 
@@ -589,7 +596,7 @@ Response:
     "channels": ["slack", "discord"],
     "queue": { "enabled": true, "connection": "redis", "name": "alertstream" },
     "snapshots": { "enabled": true, "table": "alertstream_snapshots" },
-    "throttle": { "enabled": true, "max_per_minute": 5 },
+    "throttle": { "enabled": true, "max": 5, "cooldown_minutes": 60 },
     "report_exceptions": true,
     "muted_count": 6
 }
@@ -630,8 +637,9 @@ Response:
 
 | Key | Env | Default | Description |
 |---|---|---|---|
-| `throttle.enabled` | `ALERTSTREAM_THROTTLE` | `false` | Enable per-exception rate limiting |
-| `throttle.max_per_minute` | `ALERTSTREAM_THROTTLE_MAX` | `5` | Max alerts per minute per fingerprint |
+| `throttle.enabled` | `ALERTSTREAM_THROTTLE` | `true` | Enable per-exception throttling |
+| `throttle.max` | `ALERTSTREAM_THROTTLE_MAX` | `5` | Max alerts per fingerprint allowed within the cooldown window |
+| `throttle.cooldown_minutes` | `ALERTSTREAM_THROTTLE_COOLDOWN_MINUTES` | `60` | Fixed window length (minutes) the max applies to |
 
 ### Severity & Enrichment
 

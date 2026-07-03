@@ -55,8 +55,9 @@ class AlertStreamService
      * Snapshots, throttling, and deduplication all apply.
      *
      * Note: report() intentionally does NOT write to the log webhook channels
-     * (ALERTSTREAM_LOG_CHANNELS). Those belong exclusively to log() so that an
-     * exception is never delivered twice via two separate webhooks.
+     * (ALERTSTREAM_LOG_CHANNELS) or to the `alertstream_log` file channel.
+     * Those belong exclusively to log() so that an exception is never
+     * delivered — via any channel, file or webhook — anywhere log() writes.
      *
      * @param string $message
      * @param Throwable|null $exception
@@ -101,10 +102,14 @@ class AlertStreamService
     /**
      * Log a structured message at the given level.
      *
-     * Writes to the always-on `alertstream` file channel AND to the log
+     * Writes to the always-on `alertstream_log` file channel AND to the log
      * webhook channels selected via ALERTSTREAM_LOG_CHANNELS (Slack, Teams,
      * Discord, Mail). It does NOT create snapshots or go through throttling.
      * Use report() when you need exception notifications to the alert channels.
+     *
+     * Note: `alertstream_log` is a dedicated file channel, separate from the
+     * `alertstream` file channel report() writes to — so an exception can
+     * never end up in a file that log() also writes to, and vice versa.
      *
      * Accepts any log level supported by Laravel / PSR-3:
      * emergency, alert, critical, error, warning, notice, info, debug.
@@ -165,16 +170,17 @@ class AlertStreamService
     /**
      * Resolve the Laravel logging channels that log() writes to.
      *
-     * Always includes the dedicated `alertstream` file channel, plus one
-     * `alertstream_<name>` webhook channel for every short name configured in
-     * ALERTSTREAM_LOG_CHANNELS (slack, teams, discord, mail) — mirroring the
-     * vocabulary of the alert channels. The result is de-duplicated.
+     * Always includes the dedicated `alertstream_log` file channel (never the
+     * `alertstream` channel report() writes to), plus one `alertstream_<name>`
+     * webhook channel for every short name configured in ALERTSTREAM_LOG_CHANNELS
+     * (slack, teams, discord, mail) — mirroring the vocabulary of the alert
+     * channels. The result is de-duplicated.
      *
      * @return array<int, string>
      */
     protected function resolveLogChannels(): array
     {
-        $channels = ['alertstream'];
+        $channels = ['alertstream_log'];
 
         foreach ($this->config['log_channels'] ?? [] as $name) {
             $name = trim((string) $name);

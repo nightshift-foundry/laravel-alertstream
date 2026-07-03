@@ -5,6 +5,7 @@ namespace NightshiftFoundry\AlertStream\Commands;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Log;
 use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use NightshiftFoundry\AlertStream\Services\AlertStreamService;
 use RuntimeException;
@@ -17,15 +18,15 @@ class TestAlertCommand extends Command
      * @var string
      */
     protected $signature = 'alertstream:test
-                            {channel? : The alerting channel to test (e.g. slack, teams, discord, mail)}
-                            {--type=alert : The message type — "alert" sends a report; any other value (debug, info, warning, error, critical, etc.) is passed as a log level}';
+                            {channel? : Restrict the test to one channel name (e.g. slack, teams, discord, mail)}
+                            {--type=alert : The message type — "alert" tests the report() alert pipeline; any other value (debug, info, warning, error, critical, etc.) tests the log() pipeline at that level}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Test AlertStream by sending a test alert to all or a specific channel';
+    protected $description = 'Test AlertStream by sending a test alert or log message, to all or one channel';
 
     /**
      * Execute the console command.
@@ -39,7 +40,8 @@ class TestAlertCommand extends Command
         try {
             $type = $this->option('type');
             $targetChannel = $this->argument('channel');
-            $message = 'AlertStream Test Alert';
+            $isAlert = $type === 'alert';
+            $message = $isAlert ? 'AlertStream Test Alert' : 'AlertStream Test Log';
 
             $testData = [
                 'environment' => app()->environment(),
@@ -49,53 +51,88 @@ class TestAlertCommand extends Command
                 'severity' => 'warning',
             ];
 
-            if ($targetChannel) {
-                $this->testSpecificChannel($targetChannel, $message, $testData);
-            } elseif ($type !== 'alert') {
-                $alertStream->log($type, $message, $testData);
-            } else {
+            if ($targetChannel && $isAlert) {
+                $this->testSpecificAlertChannel($targetChannel, $message, $testData);
+            } elseif ($targetChannel) {
+                $this->testSpecificLogChannel($targetChannel, $type, $message, $testData);
+            } elseif ($isAlert) {
                 $alertStream->report($message, new RuntimeException('Test exception from alertstream:test'), $testData);
+            } else {
+                $alertStream->log($type, $message, $testData);
             }
 
-            $this->info('✓ AlertStream test alert sent successfully!');
+            $this->info('✓ AlertStream test ' . ($isAlert ? 'alert' : 'log') . ' sent successfully!');
+            $this->line('Pipeline: ' . ($isAlert ? 'report() — alert channels' : 'log() — log channels'));
             $this->line('Message: ' . $message);
             $this->line('Type: ' . $type);
             if ($targetChannel) {
                 $this->line('Channel: ' . $targetChannel);
             }
 
-            $this->printChannelStatus();
+            $this->printChannelStatus($isAlert, $targetChannel);
 
             return 0;
         } catch (Exception $e) {
-            $this->error('✗ Failed to send test alert: ' . $e->getMessage());
+            $this->error('✗ Failed to send test ' . (($this->option('type') === 'alert') ? 'alert' : 'log') . ': ' . $e->getMessage());
 
             return 1;
         }
     }
 
     /**
-     * Print a diagnostic summary of active notification channels and their configuration.
+     * Print a diagnostic summary of the ONE pipeline this run actually
+     * exercised — a single command run only ever hits report() or log(),
+     * never both, so only that pipeline's status is relevant here. Pass
+     * $onlyChannel to further narrow the summary to the channel under test.
      */
-    protected function printChannelStatus(): void
+    protected function printChannelStatus(bool $isAlert, ?string $onlyChannel = null): void
     {
-        $channelsConfig = config('alertstream.channels', []);
-        $active = $channelsConfig['active'] ?? [];
-
         $this->newLine();
-        $this->line('<fg=yellow>Notification channels:</>');
 
-        if (empty($active)) {
-            $this->warn('  ⚠  None active — set ALERTSTREAM_CHANNELS in your .env');
-            $this->line('     e.g. ALERTSTREAM_CHANNELS=teams');
+        if ($isAlert) {
+            $this->line('<fg=yellow>Alert channels (report(), ALERTSTREAM_CHANNELS):</>');
+            $this->printChannelGroup(
+                active: config('alertstream.channels.active', []),
+                destinations: config('alertstream.channels', []),
+                envPrefix: 'ALERTSTREAM_',
+                emptyHint: 'ALERTSTREAM_CHANNELS',
+                onlyChannel: $onlyChannel
+            );
 
             return;
+        }
+
+        $this->line('<fg=yellow>Log channels (log(), ALERTSTREAM_LOG_CHANNELS):</>');
+        $this->printChannelGroup(
+            active: config('alertstream.log_channels', []),
+            destinations: config('alertstream.log_destinations', []),
+            envPrefix: 'ALERTSTREAM_LOG_',
+            emptyHint: 'ALERTSTREAM_LOG_CHANNELS',
+            onlyChannel: $onlyChannel
+        );
+    }
+
+    /**
+     * Print the active/destination status for one channel group (either the
+     * alert channels or the log channels). When $onlyChannel is set, only
+     * that channel's status is printed.
+     */
+    protected function printChannelGroup(array $active, array $destinations, string $envPrefix, string $emptyHint, ?string $onlyChannel = null): void
+    {
+        if (empty($active)) {
+            $this->warn("  ⚠  None active — set {$emptyHint} in your .env");
+
+            return;
+        }
+
+        if ($onlyChannel !== null) {
+            $active = array_intersect($active, [$onlyChannel]);
         }
 
         $webhookChannels = ['slack', 'teams', 'discord'];
 
         foreach ($active as $name) {
-            $cfg = $channelsConfig[$name] ?? [];
+            $cfg = $destinations[$name] ?? [];
             $label = strtoupper($name);
 
             if (in_array($name, $webhookChannels, true)) {
@@ -105,31 +142,35 @@ class TestAlertCommand extends Command
                     $preview = substr($webhook, 0, 60) . (strlen($webhook) > 60 ? '...' : '');
                     $this->line("  ✓ {$label}  webhook set → {$preview}");
                 } else {
-                    $this->warn("  ✗ {$label}  webhook not set — add ALERTSTREAM_" . strtoupper($name) . '_WEBHOOK to your .env');
+                    $this->warn("  ✗ {$label}  webhook not set — add {$envPrefix}" . strtoupper($name) . '_WEBHOOK to your .env');
                 }
             } elseif ($name === 'mail') {
                 $to = $cfg['to'] ?? null;
                 $this->line($to
                     ? "  ✓ MAIL  → {$to}"
-                    : '  ✗ MAIL  to address not set — add ALERTSTREAM_MAIL_TO to your .env');
+                    : "  ✗ MAIL  to address not set — add {$envPrefix}MAIL_TO to your .env");
             } else {
                 $this->line("  ✓ {$label}  (custom channel)");
             }
         }
     }
 
-    protected function testSpecificChannel(string $channelName, string $message, array $context): void
+    /**
+     * Send a test exception through a single tagged AlertChannel, bypassing
+     * report()'s normal fan-out to every active alert channel.
+     */
+    protected function testSpecificAlertChannel(string $channelName, string $message, array $context): void
     {
-        $channelMap = config('alertstream.channels', []);
+        $active = config('alertstream.channels.active', []);
 
-        if (! in_array($channelName, $channelMap['active'] ?? [], true)) {
+        if (! in_array($channelName, $active, true)) {
             throw new RuntimeException(
-                "Channel '{$channelName}' is not in ALERTSTREAM_CHANNELS. Active channels: "
-                . implode(', ', $channelMap['active'] ?? [])
+                "Alert channel '{$channelName}' is not in ALERTSTREAM_CHANNELS. Active channels: "
+                . implode(', ', $active)
             );
         }
 
-        $exception = new RuntimeException('Test exception for channel: ' . $channelName);
+        $exception = new RuntimeException('Test exception for alert channel: ' . $channelName);
 
         /** @var AlertChannel $channel */
         foreach (app()->tagged('alertstream.channel') as $channel) {
@@ -141,6 +182,25 @@ class TestAlertCommand extends Command
             }
         }
 
-        throw new RuntimeException("Channel '{$channelName}' is active but could not be resolved from the container.");
+        throw new RuntimeException("Alert channel '{$channelName}' is active but could not be resolved from the container.");
+    }
+
+    /**
+     * Send a test log message through a single `alertstream_<name>` log
+     * channel, bypassing log()'s normal fan-out to every configured log
+     * channel so you can verify one destination in isolation.
+     */
+    protected function testSpecificLogChannel(string $channelName, string $level, string $message, array $context): void
+    {
+        $configured = config('alertstream.log_channels', []);
+
+        if (! in_array($channelName, $configured, true)) {
+            throw new RuntimeException(
+                "Log channel '{$channelName}' is not in ALERTSTREAM_LOG_CHANNELS. Configured log channels: "
+                . implode(', ', $configured)
+            );
+        }
+
+        Log::channel('alertstream_' . $channelName)->{$level}($message, $context);
     }
 }

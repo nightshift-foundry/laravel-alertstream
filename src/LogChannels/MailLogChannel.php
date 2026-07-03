@@ -26,11 +26,10 @@ class MailLogChannel extends AbstractProcessingHandler implements LogChannel
     protected function write(LogRecord $record): void
     {
         $logDest = Config::get('alertstream.log_destinations.mail', []);
-        $alertDest = Config::get('alertstream.channels.mail', []);
 
         $config = [
-            'to' => $logDest['to'] ?: ($alertDest['to'] ?? null),
-            'from' => $logDest['from'] ?: ($alertDest['from'] ?? null),
+            'to' => $logDest['to'] ?? null,
+            'from' => $logDest['from'] ?? null,
         ];
 
         if (empty($config['to'])) {

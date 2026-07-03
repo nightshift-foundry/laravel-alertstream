@@ -11,6 +11,16 @@ class ThrottleService
      * Determine if this exception should be allowed through.
      *
      * Returns true if the alert should be SENT, false if throttled.
+     *
+     * Fixed-window cooldown: the first occurrence of a fingerprint (class +
+     * file + line) opens a window lasting `cooldown_minutes` and is always
+     * allowed. Up to `max` occurrences total are allowed inside that same
+     * window; once the cap is reached, every further occurrence is
+     * suppressed until the window elapses, however far apart the
+     * occurrences are — a bug recurring every few minutes is capped just as
+     * reliably as one firing in a tight burst. The window's expiry is set
+     * once, at the first hit, and never extended by later hits, so a
+     * steady trickle of occurrences can't keep the window open forever.
      */
     public function allow(Throwable $exception): bool
     {
@@ -19,15 +29,22 @@ class ThrottleService
         }
 
         $key = 'alertstream:throttle:' . $this->fingerprint($exception);
-        $maxPerMinute = config('alertstream.throttle.max_per_minute', 5);
+        $max = config('alertstream.throttle.max', 5);
+        $cooldownMinutes = config('alertstream.throttle.cooldown_minutes', 60);
 
-        $hits = Cache::get($key, 0);
+        $hits = Cache::get($key);
 
-        if ($hits >= $maxPerMinute) {
+        if ($hits === null) {
+            Cache::put($key, 1, now()->addMinutes($cooldownMinutes));
+
+            return $max > 0;
+        }
+
+        if ($hits >= $max) {
             return false;
         }
 
-        Cache::put($key, $hits + 1, now()->addMinutes(1));
+        Cache::increment($key);
 
         return true;
     }

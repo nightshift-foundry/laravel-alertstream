@@ -25,12 +25,14 @@ return [
     |
     | Each name maps to the auto-registered `alertstream_<name>` Monolog driver
     | and reads its destination from log_destinations.* (ALERTSTREAM_LOG_* env
-    | vars), falling back to the matching channels.* webhook when unset.
+    | vars) ONLY — there is no fallback to the matching channels.* webhook, so
+    | a channel with no log destination configured is silently skipped.
     |
-    | Logs are ALWAYS also written to the auto-registered `alertstream` file
-    | channel (storage/logs/alertstream.log), so leaving this empty still keeps
-    | a local record. This is independent of the alert channels above, so an
-    | exception reported via report() is never delivered through a log webhook.
+    | Logs are ALWAYS also written to the auto-registered `alertstream_log`
+    | file channel (storage/logs/alertstream-log.log), so leaving this empty
+    | still keeps a local record. This file is exclusive to log() — report()
+    | writes exceptions to a separate `alertstream` file channel — so an
+    | exception can never show up in a file (or webhook) that log() writes to.
     |
     */
 
@@ -138,14 +140,23 @@ return [
     | Throttling
     |--------------------------------------------------------------------------
     |
-    | Prevent alert storms by limiting how many alerts for the same exception
-    | (same class + file + line) are sent per minute.
+    | Suppress repeat alerts for the same exception (same class + file +
+    | line). The first occurrence of a fingerprint opens a window lasting
+    | ALERTSTREAM_THROTTLE_COOLDOWN_MINUTES and is always allowed; up to
+    | ALERTSTREAM_THROTTLE_MAX occurrences total are allowed inside that
+    | same window, then every further occurrence is dropped until the
+    | window elapses — however far apart the occurrences are. The window
+    | is fixed (it starts on the first hit and is never extended by later
+    | hits), so a bug recurring every few minutes forever is still capped
+    | at ALERTSTREAM_THROTTLE_MAX alerts per ALERTSTREAM_THROTTLE_COOLDOWN_MINUTES,
+    | not delivered on every single occurrence.
     |
     */
 
     'throttle' => [
         'enabled' => env('ALERTSTREAM_THROTTLE', true),
-        'max_per_minute' => env('ALERTSTREAM_THROTTLE_MAX', 5),
+        'max' => env('ALERTSTREAM_THROTTLE_MAX', 5),
+        'cooldown_minutes' => env('ALERTSTREAM_THROTTLE_COOLDOWN_MINUTES', 60),
     ],
 
     /*
@@ -228,6 +239,10 @@ return [
     | These are intentionally separate from the alert channel credentials above
     | so you can route log messages to a different endpoint than exceptions.
     |
+    | There is no fallback to channels.* above — a channel left unset here is
+    | simply not delivered to, ensuring report() and log() never converge on
+    | the same destination.
+    |
     */
 
     'log_destinations' => [
@@ -283,7 +298,7 @@ return [
 
         // Route prefix and middleware for the snapshot viewer
         'route_prefix' => env('ALERTSTREAM_SNAPSHOTS_ROUTE_PREFIX', 'alertstream'),
-        // Route middleware add 'auth' if you want login-protected access or any other middleware
-        'route_middleware' => ['web'],
+        // Route middleware adds 'auth' for login-protected access or any other middleware
+        'route_middleware' => ['web', 'auth'],
     ],
 ];

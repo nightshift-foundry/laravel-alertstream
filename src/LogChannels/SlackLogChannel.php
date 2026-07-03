@@ -26,8 +26,7 @@ class SlackLogChannel extends AbstractProcessingHandler implements LogChannel
 
     protected function write(LogRecord $record): void
     {
-        $webhook = Config::get('alertstream.log_destinations.slack.webhook')
-            ?: Config::get('alertstream.channels.slack.webhook');
+        $webhook = Config::get('alertstream.log_destinations.slack.webhook');
 
         if (empty($webhook)) {
             return;

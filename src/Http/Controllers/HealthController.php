@@ -25,7 +25,8 @@ class HealthController extends Controller
             ],
             'throttle' => [
                 'enabled' => (bool) ($config['throttle']['enabled'] ?? false),
-                'max_per_minute' => $config['throttle']['max_per_minute'] ?? 5,
+                'max' => $config['throttle']['max'] ?? 5,
+                'cooldown_minutes' => $config['throttle']['cooldown_minutes'] ?? 60,
             ],
             'report_exceptions' => (bool) ($config['report_exceptions'] ?? true),
             'muted_count' => count($config['mute'] ?? []),

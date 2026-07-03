@@ -5,7 +5,7 @@ use NightshiftFoundry\AlertStream\Http\Controllers\HealthController;
 use NightshiftFoundry\AlertStream\Http\Controllers\SnapshotController;
 
 $prefix = config('alertstream.snapshots.route_prefix', 'alertstream');
-$middleware = config('alertstream.snapshots.route_middleware', ['web']);
+$middleware = config('alertstream.snapshots.route_middleware', ['web', 'auth']);
 
 Route::middleware($middleware)
     ->prefix($prefix)

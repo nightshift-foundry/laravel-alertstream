@@ -26,8 +26,7 @@ class TeamsLogChannel extends AbstractProcessingHandler implements LogChannel
 
     protected function write(LogRecord $record): void
     {
-        $webhook = Config::get('alertstream.log_destinations.teams.webhook')
-            ?: Config::get('alertstream.channels.teams.webhook');
+        $webhook = Config::get('alertstream.log_destinations.teams.webhook');
 
         if (empty($webhook)) {
             return;

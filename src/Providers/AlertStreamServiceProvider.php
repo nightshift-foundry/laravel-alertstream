@@ -126,8 +126,12 @@ class AlertStreamServiceProvider extends ServiceProvider
      * application has not already declared it, so every channel stays fully
      * overridable from the app's own config/logging.php.
      *
-     * - alertstream: the always-on daily file channel both report() and log()
-     *   write to (storage/logs/alertstream.log).
+     * - alertstream: the always-on daily file channel written to exclusively
+     *   by report() (storage/logs/alertstream.log).
+     * - alertstream_log: the always-on daily file channel written to
+     *   exclusively by log() (storage/logs/alertstream-log.log). Kept
+     *   separate from `alertstream` so an exception reported via report()
+     *   can never show up in a file that log() also writes to.
      * - alertstream_<name>: custom Monolog drivers used by log() when the
      *   matching short name is listed in ALERTSTREAM_LOG_CHANNELS.
      */
@@ -139,6 +143,12 @@ class AlertStreamServiceProvider extends ServiceProvider
             'logging.channels.alertstream' => [
                 'driver' => 'daily',
                 'path' => storage_path('logs/alertstream.log'),
+                'level' => 'debug',
+                'days' => 14,
+            ],
+            'logging.channels.alertstream_log' => [
+                'driver' => 'daily',
+                'path' => storage_path('logs/alertstream-log.log'),
                 'level' => 'debug',
                 'days' => 14,
             ],
