@@ -45,6 +45,13 @@ class DiscordChannel implements AlertChannel
             $fields[] = ['name' => 'Snapshot', 'value' => '[View Full Stacktrace](' . $snapshotUrl . ')', 'inline' => false];
         }
 
+        if (! empty($this->config['extra_link']['url'])) {
+            $extraUrl = $this->config['extra_link']['url'];
+            $extraText = ! empty($this->config['extra_link']['text']) ? $this->config['extra_link']['text'] : 'More information';
+
+            $fields[] = ['name' => 'Link', 'value' => '[' . $extraText . '](' . $extraUrl . ')', 'inline' => false];
+        }
+
         $this->http->retry(2, 100)->post($this->config['webhook'], [
             'embeds' => [
                 [

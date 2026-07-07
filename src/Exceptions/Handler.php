@@ -179,6 +179,20 @@ class Handler
             }
         }
 
+        // Merge runtime context pushed via AlertStream::addContext(). Callable
+        // values (except plain-string callables like 'date') are resolved lazily
+        // with the exception, each isolated so a throwing callable can only drop
+        // its own key — never block reporting.
+        if ($this->alertStream->getConfig('runtime_context', true)) {
+            foreach ($this->alertStream->getRuntimeContext() as $key => $value) {
+                try {
+                    $context[$key] = (! is_string($value) && is_callable($value)) ? $value($e) : $value;
+                } catch (Throwable) {
+                    // Runtime context failure must never block reporting
+                }
+            }
+        }
+
         // Run user-registered context enrichers
         foreach ($this->alertStream->getConfig('context_enrichers', []) as $enricher) {
             try {

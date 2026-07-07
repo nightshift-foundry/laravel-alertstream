@@ -39,6 +39,7 @@ class MailChannel implements AlertChannel
             'line' => $exception->getLine(),
             'context' => $context,
             'snapshotUrl' => $snapshotUrl,
+            'extraLink' => $this->config['extra_link'] ?? [],
         ])->render();
 
         $this->mailer

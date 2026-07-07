@@ -33,6 +33,19 @@ class AlertStreamService
     protected Container $container;
 
     /**
+     * Runtime context bag — key/value pairs pushed at runtime via addContext()
+     * and merged into every subsequently reported exception's context.
+     *
+     * Populated and drained entirely within a single request/job lifecycle
+     * (see AlertStreamServiceProvider::registerContextFlushing()), since this
+     * service is registered as a singleton and would otherwise bleed context
+     * across requests/jobs in long-lived runtimes (Octane, queue workers).
+     *
+     * @var array<string, mixed>
+     */
+    protected array $runtimeContext = [];
+
+    /**
      * Create a new service instance.
      *
      * @param array $config
@@ -165,6 +178,58 @@ class AlertStreamService
     public function getConfig(string $key, $default = null)
     {
         return $this->config[$key] ?? $default;
+    }
+
+    /**
+     * Push key/value pairs onto the runtime context bag.
+     *
+     * Merged (via array_merge, so later keys overwrite earlier ones) into
+     * every subsequently reported exception's context by
+     * Handler::buildContext(), which reads the bag synchronously — this is
+     * what makes it safe to use even when reporting is queued.
+     *
+     * Values may be plain scalars/arrays, or callables. A callable value is
+     * resolved lazily at report time, receiving the exception being reported
+     * as its single argument — see Handler::buildContext(). A plain string
+     * is never treated as callable here (e.g. a value of 'date' is kept as
+     * the literal string, not invoked as a function name).
+     *
+     * No-op when the 'runtime_context' config key is disabled, so the bag
+     * silently stays empty and getRuntimeContext() reflects that.
+     *
+     * @param array<string, mixed> $context
+     */
+    public function addContext(array $context): void
+    {
+        if (! $this->getConfig('runtime_context', true)) {
+            return;
+        }
+
+        $this->runtimeContext = array_merge($this->runtimeContext, $context);
+    }
+
+    /**
+     * Get the current runtime context bag.
+     *
+     * @return array<string, mixed>
+     */
+    public function getRuntimeContext(): array
+    {
+        return $this->runtimeContext;
+    }
+
+    /**
+     * Reset the runtime context bag to empty.
+     *
+     * Called automatically at the end of each request/console lifecycle and
+     * after each processed queue job (see
+     * AlertStreamServiceProvider::registerContextFlushing()) so a
+     * long-lived singleton never leaks context between requests/jobs under
+     * Octane or a queue worker.
+     */
+    public function flushContext(): void
+    {
+        $this->runtimeContext = [];
     }
 
     /**

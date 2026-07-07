@@ -84,6 +84,20 @@ class TeamsChannel implements AlertChannel
             $html .= '<p>🔗 <a href="' . htmlspecialchars($snapshotUrl, ENT_QUOTES | ENT_HTML5) . '"><strong>View Full Stacktrace</strong></a></p>';
         }
 
+        // Extra link (optional, configured globally for every alert channel)
+        if (! empty($this->config['extra_link']['url'])) {
+            $extraUrl = $this->config['extra_link']['url'];
+            $extraText = ! empty($this->config['extra_link']['text']) ? $this->config['extra_link']['text'] : 'More information';
+
+            // Only emit a separating <hr/> here if the snapshot block above
+            // didn't already emit one before its own link.
+            if (! $snapshotUrl) {
+                $html .= '<hr/>';
+            }
+
+            $html .= '<p>🔗 <a href="' . htmlspecialchars($extraUrl, ENT_QUOTES | ENT_HTML5) . '"><strong>' . htmlspecialchars($extraText, ENT_QUOTES | ENT_HTML5) . '</strong></a></p>';
+        }
+
         $html .= '</div>';
 
         $payload = [

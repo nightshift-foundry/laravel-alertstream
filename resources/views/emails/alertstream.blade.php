@@ -220,6 +220,21 @@
         </tr>
         @endif
 
+        {{-- ── Extra link CTA (optional, configured globally via `extra_link`) ─── --}}
+        @php($extraLink = $extraLink ?? [])
+        @if (! empty($extraLink['url'] ?? null))
+        @php($extraLinkText = ! empty($extraLink['text'] ?? null) ? $extraLink['text'] : 'More information')
+        <tr>
+            <td class="as-cta"
+                style="background-color:#eff6ff;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-top:1px solid #bfdbfe;padding:22px 28px;text-align:center;">
+                <a href="{{ $extraLink['url'] }}"
+                   style="display:inline-block;background-color:#3b82f6;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;letter-spacing:0.01em;">
+                    🔗 {{ $extraLinkText }}
+                </a>
+            </td>
+        </tr>
+        @endif
+
         {{-- ── Footer bar ──────────────────────────────────────────────── --}}
         <tr>
             <td class="as-footer"

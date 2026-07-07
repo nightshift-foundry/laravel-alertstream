@@ -7,6 +7,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 use NightshiftFoundry\AlertStream\AlertChannels\DiscordChannel;
 use NightshiftFoundry\AlertStream\AlertChannels\MailChannel;
@@ -94,6 +95,11 @@ class AlertStreamServiceProvider extends ServiceProvider
 
         // Automatically register exception handler callback
         $this->registerExceptionHandler();
+
+        // Flush the runtime context bag at the end of each request/job so the
+        // AlertStreamService singleton never leaks context across requests
+        // or jobs in long-lived runtimes (Octane, queue workers).
+        $this->registerContextFlushing();
 
         // Always register views so the email template is available regardless of
         // whether snapshots are enabled.
@@ -198,7 +204,10 @@ class AlertStreamServiceProvider extends ServiceProvider
      */
     protected function registerBuiltInChannels(): void
     {
-        $config = $this->app['config']['alertstream']['channels'] ?? [];
+        // Read the full alertstream config (not just channels.*) so the
+        // global extra_link block below can be merged into every channel.
+        $alertstreamConfig = $this->app['config']['alertstream'] ?? [];
+        $config = $alertstreamConfig['channels'] ?? [];
         $active = $config['active'] ?? [];
         $toTag = [];
 
@@ -208,6 +217,12 @@ class AlertStreamServiceProvider extends ServiceProvider
             }
 
             $channelConfig = $config[$name] ?? [];
+
+            // Merge the single global extra_link into each built-in channel's
+            // own config slice so it can render it alongside the snapshot
+            // link. Custom third-party channels are not touched here — they
+            // read config (including alertstream.extra_link) themselves.
+            $channelConfig['extra_link'] = $alertstreamConfig['extra_link'] ?? [];
 
             $this->app->bind($class, function ($app) use ($class, $channelConfig) {
                 return match ($class) {
@@ -246,5 +261,36 @@ class AlertStreamServiceProvider extends ServiceProvider
             // Silently fail if exception handler is not available
             // This prevents issues during application bootstrap
         }
+    }
+
+    /**
+     * Register automatic flushing of the runtime context bag.
+     *
+     * AlertStreamService is a singleton, so its runtime context bag (pushed
+     * to via AlertStream::addContext()) would otherwise bleed from one
+     * request/job into the next in long-lived runtimes such as Laravel
+     * Octane or a queue worker process. Two hooks keep it scoped to a single
+     * request/console lifecycle or a single queue job:
+     *
+     * - app()->terminating(): fires at the end of every request/console
+     *   lifecycle, and per-request under Octane.
+     * - Queue::after(): fires after every processed queue job.
+     *
+     * Both guard with $this->app->resolved() first, so flushing never forces
+     * the service to be instantiated when nothing ever used it.
+     */
+    protected function registerContextFlushing(): void
+    {
+        $this->app->terminating(function (): void {
+            if ($this->app->resolved(AlertStreamService::class)) {
+                $this->app->make(AlertStreamService::class)->flushContext();
+            }
+        });
+
+        Queue::after(function (): void {
+            if ($this->app->resolved(AlertStreamService::class)) {
+                $this->app->make(AlertStreamService::class)->flushContext();
+            }
+        });
     }
 }

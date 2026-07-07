@@ -76,7 +76,6 @@ return [
 
     'mute' => [
         Illuminate\Auth\AuthenticationException::class,
-        Illuminate\Auth\AuthorizationException::class,
         Illuminate\Validation\ValidationException::class,
         Illuminate\Http\Exceptions\HttpResponseException::class,
         Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class,
@@ -108,6 +107,31 @@ return [
     */
 
     'context_enrichers' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Runtime Context Bag
+    |--------------------------------------------------------------------------
+    |
+    | Lets host apps push arbitrary key/value data at runtime — e.g.
+    | AlertStream::addContext(['request_id' => $id]) — that gets merged into
+    | every exception context reported for the rest of the current
+    | request/console command or queue job. A value may be a callable; it is
+    | then resolved lazily at report time with the exception as its argument,
+    | so expensive or exception-dependent values are computed only when
+    | actually needed.
+    |
+    | The bag lives on the AlertStreamService singleton, so it is
+    | automatically emptied at the end of every request/console lifecycle
+    | (also per-request under Octane) and after every processed queue job —
+    | it never carries over from one request/job to the next.
+    |
+    | Set ALERTSTREAM_RUNTIME_CONTEXT=false to disable the bag entirely —
+    | addContext() then becomes a no-op.
+    |
+    */
+
+    'runtime_context' => env('ALERTSTREAM_RUNTIME_CONTEXT', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -228,6 +252,24 @@ return [
             'from' => env('ALERTSTREAM_MAIL_FROM'),
         ],
 
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Extra Link
+    |--------------------------------------------------------------------------
+    |
+    | An optional link appended to every alert message on all alert channels
+    | (Slack, Teams, Discord, Mail) — e.g. a link to a dashboard, runbook, or
+    | internal wiki page. Rendered alongside the snapshot link when set.
+    |
+    | Leave ALERTSTREAM_EXTRA_LINK_URL unset to omit it entirely.
+    |
+    */
+
+    'extra_link' => [
+        'url' => env('ALERTSTREAM_EXTRA_LINK_URL'),
+        'text' => env('ALERTSTREAM_EXTRA_LINK_TEXT', 'More information'),
     ],
 
     /*

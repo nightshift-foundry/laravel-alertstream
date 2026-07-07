@@ -24,6 +24,8 @@ No configuration required for exception reporting, queue-friendly, and runs comp
 - 🔗 **Deduplication** - group identical exceptions into a single snapshot with occurrence count
 - 🎯 **Severity mapping** - override auto-detected severity per exception class via config
 - 🧩 **Context enrichers** - plug in custom callables to add tenant ID, git SHA, or any data to every alert
+- 🎒 **Runtime context bag** - push per-request key/value data (e.g. a request ID) at runtime; captured synchronously, queue-safe, auto-cleared per request/job
+- 🌐 **Extra link** - append one configurable link (dashboard, runbook, wiki page) to every alert message on every channel
 - 🔔 **Notification channel** - use AlertStream as a Laravel notification channel alongside mail, SMS, etc.
 - 💚 **Health check endpoint** - JSON endpoint to verify AlertStream status from monitoring dashboards
 - 🔄 **Webhook retry** - automatic retry with backoff on transient webhook failures
@@ -347,6 +349,17 @@ php artisan vendor:publish --tag=alertstream-views
 
 This publishes the view to `resources/views/vendor/alertstream/snapshots/show.blade.php` where you can customise the layout, styling, and content.
 
+## Extra Link
+
+Append one extra link to every alert message on every alert channel (Slack, Teams, Discord, Mail) — a dashboard, runbook, on-call wiki page, whatever your team wants one click away. It's rendered right next to the snapshot link.
+
+```env
+ALERTSTREAM_EXTRA_LINK_URL=https://wiki.your-company.com/runbooks/payments
+ALERTSTREAM_EXTRA_LINK_TEXT="Open Runbook"   # optional, defaults to "More information"
+```
+
+Leave `ALERTSTREAM_EXTRA_LINK_URL` unset to omit the link entirely. It's applied to the built-in channels only — custom channels don't get it automatically, but can opt in by reading `alertstream.extra_link` from config themselves.
+
 ## Manual Usage
 
 AlertStream provides two distinct ways to send messages:
@@ -542,6 +555,30 @@ Register enrichers in config:
 
 Enrichers run in order. If one throws, it is silently skipped and reporting continues with the remaining enrichers.
 
+## Runtime Context
+
+Push key/value data onto AlertStream at runtime — from a middleware, a controller, anywhere — and it gets merged into every exception context reported for the rest of the current request, console command, or queue job:
+
+```php
+use NightshiftFoundry\AlertStream\Facades\AlertStream;
+
+AlertStream::addContext([
+    'request_id' => $requestId,
+    'tenant_id'  => $tenant->id,
+    'git_sha'    => fn (\Throwable $e) => config('app.git_sha'),
+]);
+```
+
+A value may be a plain scalar/array, or a closure. Closures are resolved lazily at report time, receiving the exception being reported as their argument — handy for values that are only worth computing when something actually goes wrong. If a closure throws, only its own key is dropped; reporting continues unaffected.
+
+Runtime context is captured **synchronously**, inside `Handler::buildContext()`, before the exception is ever handed to the queue — so it works safely even with `queue` enabled (the default). Reading it any later, e.g. from the queued listener, would be too late: the bag is emptied by then.
+
+The bag lives on the underlying service singleton, so it is automatically cleared at the end of every request/console lifecycle and after every processed queue job — nothing carries over from one request or job to the next, even under Octane or a long-running queue worker.
+
+```env
+ALERTSTREAM_RUNTIME_CONTEXT=true   # default; set to false to disable the bag entirely
+```
+
 ## Snapshot Deduplication
 
 When a snapshot already exists for the same exception (same class + file + line) within the configured window, AlertStream increments the existing snapshot's occurrence counter instead of creating a duplicate row.
@@ -633,6 +670,13 @@ Response:
 | `channels.mail.to` | `ALERTSTREAM_MAIL_TO` | - | Alert recipient address |
 | `channels.mail.from` | `ALERTSTREAM_MAIL_FROM` | _(mail.from)_ | Sender address |
 
+### Extra Link
+
+| Key | Env | Default | Description |
+|---|---|---|---|
+| `extra_link.url` | `ALERTSTREAM_EXTRA_LINK_URL` | _(none)_ | Extra link URL appended to every alert message on all alert channels |
+| `extra_link.text` | `ALERTSTREAM_EXTRA_LINK_TEXT` | `More information` | Display text for the extra link |
+
 ### Throttling
 
 | Key | Env | Default | Description |
@@ -647,6 +691,7 @@ Response:
 |---|---|---|
 | `severity_map` | `array` | `ExceptionClass::class => 'critical'\|'error'\|'warning'` |
 | `context_enrichers` | `array` | Invokable class FQCNs that augment every alert context |
+| `runtime_context` | `bool` | Enable the `AlertStream::addContext()` runtime context bag (`ALERTSTREAM_RUNTIME_CONTEXT`, default `true`) |
 
 ### Snapshots
 

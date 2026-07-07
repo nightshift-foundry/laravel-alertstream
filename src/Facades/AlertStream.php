@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Facade;
  * @method static void log(string|\NightshiftFoundry\AlertStream\Enums\AlertStreamLogLevel $level, string $message, $data = null, array $context = [])
  * @method static void debug(string $message, $data = null, array $context = [])
  * @method static mixed getConfig(string $key, $default = null)
+ * @method static void addContext(array $context)
+ * @method static array getRuntimeContext()
+ * @method static void flushContext()
  *
  * @see \NightshiftFoundry\AlertStream\Services\AlertStreamService
  */

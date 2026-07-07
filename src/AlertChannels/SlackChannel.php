@@ -80,6 +80,19 @@ class SlackChannel implements AlertChannel
             ];
         }
 
+        if (! empty($this->config['extra_link']['url'])) {
+            $extraUrl = $this->config['extra_link']['url'];
+            $extraText = ! empty($this->config['extra_link']['text']) ? $this->config['extra_link']['text'] : 'More information';
+
+            $blocks[] = [
+                'type' => 'section',
+                'text' => [
+                    'type' => 'mrkdwn',
+                    'text' => '🔗 <' . $extraUrl . '|' . $extraText . '>',
+                ],
+            ];
+        }
+
         $blocks[] = [
             'type' => 'context',
             'elements' => [
