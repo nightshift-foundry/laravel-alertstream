@@ -6,7 +6,6 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Log\LogManager;
 use NightshiftFoundry\AlertStream\AlertChannels\Contracts\AlertChannel;
 use NightshiftFoundry\AlertStream\Enums\AlertStreamLogLevel;
-use NightshiftFoundry\AlertStream\Exceptions\AlertStreamException;
 use Throwable;
 
 class AlertStreamService
@@ -72,16 +71,19 @@ class AlertStreamService
      * Those belong exclusively to log() so that an exception is never
      * delivered — via any channel, file or webhook — anywhere log() writes.
      *
+     * No-ops when the package is disabled (ALERTSTREAM_ENABLED=false) — this
+     * is an observability call bolted onto business logic, so it must never
+     * be able to interrupt the caller's control flow just because alerting
+     * isn't configured.
+     *
      * @param string $message
      * @param Throwable|null $exception
      * @param array $context
-     *
-     * @throws AlertStreamException
      */
     public function report(string $message, ?Throwable $exception = null, array $context = []): void
     {
         if (! $this->config['enabled']) {
-            throw new AlertStreamException('AlertStream is not enabled. Check your ALERTSTREAM_ENABLED environment variable.');
+            return;
         }
 
         $logData = array_merge([
@@ -128,17 +130,20 @@ class AlertStreamService
      * emergency, alert, critical, error, warning, notice, info, debug.
      * An AlertStreamLogLevel enum case may be passed in place of the string.
      *
+     * No-ops when the package is disabled (ALERTSTREAM_ENABLED=false) — this
+     * is an observability call bolted onto business logic, so it must never
+     * be able to interrupt the caller's control flow just because alerting
+     * isn't configured.
+     *
      * @param string|AlertStreamLogLevel $level Any PSR-3 log level string, or an AlertStreamLogLevel case
      * @param string $message
      * @param mixed $data
      * @param array $context
-     *
-     * @throws AlertStreamException
      */
     public function log(string|AlertStreamLogLevel $level, string $message, $data = null, array $context = []): void
     {
         if (! $this->config['enabled']) {
-            throw new AlertStreamException('AlertStream is not enabled. Check your ALERTSTREAM_ENABLED environment variable.');
+            return;
         }
 
         $level = $level instanceof AlertStreamLogLevel ? $level->value : $level;
@@ -159,8 +164,6 @@ class AlertStreamService
      * @param string $message
      * @param mixed $data
      * @param array $context
-     *
-     * @throws AlertStreamException
      */
     public function debug(string $message, $data = null, array $context = []): void
     {
