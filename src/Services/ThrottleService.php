@@ -29,8 +29,8 @@ class ThrottleService
         }
 
         $key = 'alertstream:throttle:' . $this->fingerprint($exception);
-        $max = config('alertstream.throttle.max', 5);
-        $cooldownMinutes = config('alertstream.throttle.cooldown_minutes', 60);
+        $max = (int) config('alertstream.throttle.max', 5);
+        $cooldownMinutes = (int) config('alertstream.throttle.cooldown_minutes', 60);
 
         $hits = Cache::get($key);
 
