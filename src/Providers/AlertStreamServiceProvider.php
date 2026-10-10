@@ -247,19 +247,36 @@ class AlertStreamServiceProvider extends ServiceProvider
      */
     protected function registerExceptionHandler(): void
     {
-        // Get the application's exception handler
-        try {
-            $exceptionHandler = $this->app->make('Illuminate\Contracts\Debug\ExceptionHandler');
-            // Use Laravel's reportable() method to register our handler
-            if (method_exists($exceptionHandler, 'reportable')) {
-                $exceptionHandler->reportable(function (Throwable $e): void {
-                    $handler = $this->app->make(Handler::class);
-                    $handler->handle($e);
-                });
+        $contract = 'Illuminate\Contracts\Debug\ExceptionHandler';
+        $hooked = [];
+
+        $hook = function (object $exceptionHandler) use (&$hooked): void {
+            if (! method_exists($exceptionHandler, 'reportable')) {
+                return;
             }
-        } catch (Throwable $e) {
-            // Silently fail if exception handler is not available
-            // This prevents issues during application bootstrap
+
+            // Hook each handler instance exactly once, even if it resolves repeatedly.
+            $id = spl_object_id($exceptionHandler);
+            if (isset($hooked[$id])) {
+                return;
+            }
+            $hooked[$id] = true;
+
+            $exceptionHandler->reportable(function (Throwable $e): void {
+                $this->app->make(Handler::class)->handle($e);
+            });
+        };
+
+        // Another package (or the app) may rebind the handler after we boot, so
+        // hook every instance as it resolves rather than only the current one.
+        $this->app->afterResolving($contract, $hook);
+
+        if ($this->app->resolved($contract)) {
+            try {
+                $hook($this->app->make($contract));
+            } catch (Throwable) {
+                // Exception handler unavailable during bootstrap
+            }
         }
     }
 

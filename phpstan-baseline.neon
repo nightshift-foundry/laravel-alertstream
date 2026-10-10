@@ -77,9 +77,3 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: src/Models/Snapshot.php
-
-		-
-			message: '#^Call to function method_exists\(\) with NunoMaduro\\Collision\\Adapters\\Laravel\\ExceptionHandler and ''reportable'' will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Providers/AlertStreamServiceProvider.php
